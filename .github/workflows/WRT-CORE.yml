@@ -157,18 +157,6 @@ jobs:
           restore-keys: ${{env.WRT_CACHE_PREFIX}}-
           path: |
             ./wrt/.ccache
-            ./wrt/staging_dir/host*
-            ./wrt/staging_dir/tool*
-
-      - name: Prepare Restored Build Cache
-        if: ${{ !inputs.WRT_TEST && steps.cache-restore.outputs.cache-matched-key != '' }}
-        run: |
-          find "./wrt/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r DIR; do
-            find "$DIR" -type f -exec touch {} +
-          done
-          mkdir -p ./wrt/tmp
-          echo "1" > ./wrt/tmp/.build
-          echo "restored build cache: ${{steps.cache-restore.outputs.cache-matched-key}}"
 
       - name: Update Feeds
         run: |
@@ -222,8 +210,6 @@ jobs:
           key: ${{env.WRT_CACHE_KEY}}
           path: |
             ./wrt/.ccache
-            ./wrt/staging_dir/host*
-            ./wrt/staging_dir/tool*
 
       - name: Machine Information
         run: |
