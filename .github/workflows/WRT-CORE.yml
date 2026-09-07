@@ -127,7 +127,7 @@ jobs:
           fi
           
           # 清掉上次构建残留，但保留 feeds / staging_dir（工具链）
-          git clean -ffdx -e feeds -e staging_dir
+          git clean -ffdx -e feeds
           
           # 共享的下载目录与 ccache 目录（软链被 clean 掉了，重建即可）
           ln -sfn "$WRT_ROOT/dl"     "$SRC/dl"
