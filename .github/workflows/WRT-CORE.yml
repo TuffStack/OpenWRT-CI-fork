@@ -59,11 +59,16 @@ env:
   WRT_SOURCE: ${{inputs.WRT_SOURCE}}
   WRT_PACKAGE: ${{inputs.WRT_PACKAGE}}
   WRT_TEST: ${{inputs.WRT_TEST}}
+  WRT_ROOT: /mnt/wrt
+  CCACHE_MAXSIZE: 50G
 
 jobs:
   core:
     name: ${{inputs.WRT_SOURCE}}
     runs-on: self-hosted
+    concurrency:
+      group: wrt-selfhosted      # 全局唯一，所有构建排队执行
+      cancel-in-progress: false
     outputs:
       cache_prefix: ${{steps.initialize-values.outputs.cache_prefix}}
       cache_key: ${{steps.clone-code.outputs.cache_key}}
@@ -86,9 +91,10 @@ jobs:
           sudo -E systemctl daemon-reload
           sudo -E timedatectl set-timezone "Asia/Shanghai"
 
-          sudo mkdir -p /mnt/build_wrt
-          sudo chown $USER:$USER /mnt/build_wrt
-          sudo ln -s /mnt/build_wrt $GITHUB_WORKSPACE/wrt
+          sudo mkdir -p "$WRT_ROOT/src" "$WRT_ROOT/dl" "$WRT_ROOT/ccache"
+          sudo chown -R "$USER:$USER" "$WRT_ROOT"
+          command -v ccache > /dev/null && ccache -M "$CCACHE_MAXSIZE" || true
+          df -h "$WRT_ROOT"
 
       - name: Initialization Values
         id: initialize-values
@@ -114,22 +120,40 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "cache_prefix=$WRT_CACHE_PREFIX" >> "$GITHUB_OUTPUT"
 
-      - name: Clone Code
-        id: clone-code
+      - name: Sync Code
+        id: sync-code
         run: |
-          git clone --depth=1 --single-branch --branch $WRT_BRANCH $WRT_REPO ./wrt/
-
-          cd ./wrt/
-          WRT_HASH=$(git rev-parse HEAD)
-          echo "WRT_HASH=$WRT_HASH" >> $GITHUB_ENV
-          echo "WRT_CACHE_KEY=$WRT_CACHE_PREFIX-$WRT_HASH" >> $GITHUB_ENV
-          echo "cache_key=$WRT_CACHE_PREFIX-$WRT_HASH" >> "$GITHUB_OUTPUT"
-
-          # GitHub Action 移除国内下载源
-          PROJECT_MIRRORS_FILE="./scripts/projectsmirrors.json"
-          if [ -f "$PROJECT_MIRRORS_FILE" ]; then
-            sed -i '/.cn\//d; /tencent/d; /aliyun/d' "$PROJECT_MIRRORS_FILE"
+          set -e
+          SRC="$WRT_ROOT/src-${WRT_SOURCE//\//-}-${WRT_BRANCH//\//-}"
+          
+          if [ -d "$SRC/.git" ]; then
+            cd "$SRC"
+            git remote set-url origin "$WRT_REPO"
+            git fetch --depth=1 --force origin "$WRT_BRANCH"
+            git reset --hard FETCH_HEAD
+          else
+            rm -rf "$SRC"
+            git clone --depth=1 --single-branch --branch "$WRT_BRANCH" "$WRT_REPO" "$SRC"
+            cd "$SRC"
           fi
+          
+          # 清掉上次构建残留，但保留 feeds / staging_dir（工具链）
+          git clean -ffdx -e feeds -e staging_dir
+          
+          # 共享的下载目录与 ccache 目录（软链被 clean 掉了，重建即可）
+          ln -sfn "$WRT_ROOT/dl"     "$SRC/dl"
+          ln -sfn "$WRT_ROOT/ccache" "$SRC/.ccache"
+          
+          # workspace 软链指向大盘上的持久化源码
+          rm -rf "$GITHUB_WORKSPACE/wrt"
+          ln -sfn "$SRC" "$GITHUB_WORKSPACE/wrt"
+          
+          cd "$GITHUB_WORKSPACE/wrt"
+          WRT_HASH=$(git rev-parse HEAD)
+          echo "WRT_HASH=$WRT_HASH" >> "$GITHUB_ENV"
+          echo "WRT_SRC_DIR=$SRC" >> "$GITHUB_ENV"
+          echo "WRT_CACHE_KEY=$WRT_CACHE_PREFIX-$WRT_HASH" >> "$GITHUB_ENV"
+          echo "cache_key=$WRT_CACHE_PREFIX-$WRT_HASH" >> "$GITHUB_OUTPUT"
 
       - name: Check Scripts
         run: |
@@ -183,7 +207,10 @@ jobs:
 
           $GITHUB_WORKSPACE/Scripts/Settings.sh
 
-          make defconfig -j$(nproc) && make clean -j$(nproc)
+          make defconfig -j$(nproc)
+          if [[ "${WRT_CLEAN:-true}" == "true" ]]; then
+            make clean -j$(nproc)
+          fi
 
       - name: Download Packages
         if: ${{ !inputs.WRT_TEST }}
