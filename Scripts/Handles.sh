@@ -228,6 +228,38 @@ if [ -d "$PKG_PATH/luci-app-mini-diskmanager" ]; then
 	fi
 fi
 
+LUCKY_VER="${LUCKY_VER:-3.0.0}"
+LUCKY_BETA="${LUCKY_BETA:-beta8}"
+LUCKY_TAG="${LUCKY_TAG:-xiaojv_waf}"
+LUCKY_BASE="https://release.66666.host/v${LUCKY_VER}${LUCKY_BETA}/${LUCKY_VER}_${LUCKY_TAG}/"
+LUCKY_MK="$(find "$PKG_PATH" -maxdepth 4 -type f -wholename '*/lucky/Makefile' -print -quit 2>/dev/null)"
+if [ -f "$LUCKY_MK" ]; then
+	echo " "
+
+	sed -i \
+		-e "s/^PKG_VERSION:=.*/PKG_VERSION:=$LUCKY_VER/" \
+		-e 's#https://github\.com/gdy666/lucky/releases/download/v[$](PKG_VERSION)/#'"$LUCKY_BASE"'#g' \
+		-e 's#_Linux_[$](LUCKY_ARCH)\.tar\.gz#_Linux_$(LUCKY_ARCH)_'"$LUCKY_TAG"'.tar.gz#g' \
+		"$LUCKY_MK"
+
+	#兼容tar包内带一层目录的情况，把lucky二进制平铺到编译目录
+	awk '
+		/tar -xzvf/ && !n {
+			print
+			print "\t[ -f $(PKG_BUILD_DIR)/lucky ] || find $(PKG_BUILD_DIR) -type f -name lucky -exec mv -f {} $(PKG_BUILD_DIR)/lucky \\;"
+			n = 1
+			next
+		}
+		{ print }
+	' "$LUCKY_MK" > "$LUCKY_MK.tmp" && mv -f "$LUCKY_MK.tmp" "$LUCKY_MK"
+
+	grep -nE 'PKG_VERSION:=|release\.66666\.host|xiaojv_waf' "$LUCKY_MK"
+	echo "lucky has been fixed!"
+else
+	echo "lucky not found; skipping!"
+fi
+
+
 #修复TailScale配置文件冲突
 FEEDS_PACKAGES="$PKG_PATH/../feeds/packages"
 TS_FILE="$(find "$FEEDS_PACKAGES" -maxdepth 3 -type f -wholename '*/tailscale/Makefile' -print -quit 2>/dev/null)"
