@@ -106,8 +106,12 @@ if [ -n "$SFP_DTS" ] && grep -q 'ppe_sfp: port@2' "$SFP_DTS"; then
 			/managed = "in-band-status"/d
 			/qcom,sfp-force-sgmii/d
 			/sfp = <&sfp0>/d
-			s/phy-mode = ".*"/phy-mode = "2500base-x"/
-			s|^$[[:space:]]*$};$|\t\t\tfixed-link {\n\t\t\t\tspeed = <2500>;\n\t\t\t\tfull-duplex;\n\t\t\t};\n\1};|
+			s/phy-mode = "[^"]*"/phy-mode = "2500base-x"/
+			/^[[:space:]]*};$/i\
+\t\t\tfixed-link {\
+\t\t\t\tspeed = <2500>;\
+\t\t\t\tfull-duplex;\
+\t\t\t};
 		}' "$SFP_DTS"
 		echo "re-cs-08 sfp: patched to fixed-link 2500base-x"
 		sed -n '/ppe_sfp: port@2 {/,/^[[:space:]]*};$/p' "$SFP_DTS"
