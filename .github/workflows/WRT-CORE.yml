@@ -44,6 +44,11 @@ on:
         required: false
         default: false
         type: boolean
+      WRT_CLEAN:
+        description: '编译前执行 make clean（清空 build_dir）。默认 false，保留增量缓存。'
+        required: false
+        default: false
+        type: boolean
 
 env:
   GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
@@ -61,6 +66,11 @@ env:
   WRT_TEST: ${{inputs.WRT_TEST}}
   WRT_ROOT: /mnt/wrt
   CCACHE_MAXSIZE: 50G
+  WRT_CLEAN: ${{inputs.WRT_CLEAN}}
+  CCACHE_DIR: /mnt/wrt/ccache
+  GOCACHE: /mnt/wrt/go/build
+  GOMODCACHE: /mnt/wrt/go/mod
+  GOFLAGS: -buildvcs=false
 
 jobs:
   core:
@@ -79,7 +89,7 @@ jobs:
         run: |
           set -e
           RUN_USER="$(id -un)"
-          sudo mkdir -p "$WRT_ROOT/src" "$WRT_ROOT/dl" "$WRT_ROOT/ccache"
+          sudo mkdir -p "$WRT_ROOT/src" "$WRT_ROOT/dl" "$WRT_ROOT/ccache" "$WRT_ROOT/go"
           sudo chown -R "$RUN_USER:$(id -gn)" "$WRT_ROOT"
           unset LD_LIBRARY_PATH LD_PRELOAD
 
@@ -90,7 +100,7 @@ jobs:
           echo abc | sed 's/a/X/' | grep -q Xbc || {
             echo "::error::sed broken (glibc mismatch)"; exit 1; }
 
-          command -v ccache > /dev/null && ccache -M "$CCACHE_MAXSIZE" || true
+          command -v ccache > /dev/null && { ccache -M "$CCACHE_MAXSIZE"; ccache -z; } || true
           df -h "$WRT_ROOT"
 
       - name: Initialization Values
@@ -135,9 +145,11 @@ jobs:
           fi
           
           # 清掉上次构建残留，但保留 feeds / staging_dir（工具链）
-          git clean -ffdx -e feeds -e staging_dir
-          
-          # 共享的下载目录与 ccache 目录（软链被 clean 掉了，重建即可）
+          git clean -ffdx \
+            -e feeds -e staging_dir -e build_dir -e tmp -e logs -e bin \
+            -e dl -e .ccache -e key-build -e key-build.pub -e key-build.ucert
+
+          # 共享目录软链（若被 clean 掉则重建）
           ln -sfn "$WRT_ROOT/dl"     "$SRC/dl"
           ln -sfn "$WRT_ROOT/ccache" "$SRC/.ccache"
           
@@ -184,7 +196,7 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Kernel.sh    
 
           make defconfig -j$(nproc)
-          if [[ "${WRT_CLEAN:-true}" == "true" ]]; then
+          if [[ "${WRT_CLEAN:-false}" == "true" ]]; then
             make clean -j$(nproc)
           fi
 
@@ -200,7 +212,19 @@ jobs:
         run: |
           cd ./wrt/
 
+          # 用 OpenWrt 自带的 ccache 设置容量（系统 ccache 跟它不是一个）
+          if [ -x ./staging_dir/host/bin/ccache ]; then
+            CCACHE_DIR="${CCACHE_DIR:-/mnt/wrt/ccache}" ./staging_dir/host/bin/ccache -M "$CCACHE_MAXSIZE"
+            CCACHE_DIR="${CCACHE_DIR:-/mnt/wrt/ccache}" ./staging_dir/host/bin/ccache -z
+          fi
+
+          mkdir -p "${GOCACHE:-/mnt/wrt/go/build}" "${GOMODCACHE:-/mnt/wrt/go/mod}"
+
           make -j$(nproc) || make -j1 V=s
+
+          if [ -x ./staging_dir/host/bin/ccache ]; then
+            CCACHE_DIR="${CCACHE_DIR:-/mnt/wrt/ccache}" ./staging_dir/host/bin/ccache -s
+          fi
 
       - name: Machine Information
         run: |
@@ -235,7 +259,7 @@ jobs:
 
             find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
 
-            if [[ "${WRT_CLEAN:-true}" == "true" ]]; then
+            if [[ "${WRT_CLEAN:-false}" == "true" ]]; then
               make clean -j$(nproc)
             fi
           fi

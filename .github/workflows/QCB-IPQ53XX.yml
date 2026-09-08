@@ -68,5 +68,7 @@ jobs:
       WRT_SOURCE: ${{matrix.SOURCE}}
       #插件调整
       WRT_PACKAGE: ${{inputs.PACKAGE}}
+      #彻底重编（清空 build_dir），默认 false
+      WRT_CLEAN: ${{inputs.WRT_CLEAN}}
       #仅输出配置文件
       WRT_TEST: ${{inputs.TEST || false}}
