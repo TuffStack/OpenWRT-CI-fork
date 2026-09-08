@@ -99,18 +99,18 @@ fi
 #做法：去掉 sfp 属性（绕开模块能力校验）+ fixed-link 固定 2.5G 全双工，不等 in-band 自协商。
 SFP_DTS="$(find ./target/linux/qualcommbe -name 'ipq5332-re-cs-08.dts' -print -quit 2>/dev/null)"
 if [ -n "$SFP_DTS" ] && grep -q 'ppe_sfp: port@2' "$SFP_DTS"; then
-	if sed -n '/ppe_sfp: port@2 {/,/};/p' "$SFP_DTS" | grep -q 'fixed-link'; then
+	if sed -n '/ppe_sfp: port@2 {/,/^[[:space:]]*};$/p' "$SFP_DTS" | grep -q 'fixed-link'; then
 		echo "re-cs-08 sfp: fixed-link already present; skipping"
 	else
-		sed -i '/ppe_sfp: port@2 {/,/};/{
+		sed -i '/ppe_sfp: port@2 {/,/^[[:space:]]*};$/{
 			/managed = "in-band-status"/d
 			/qcom,sfp-force-sgmii/d
 			/sfp = <&sfp0>/d
 			s/phy-mode = ".*"/phy-mode = "2500base-x"/
-			s|phy-mode = "2500base-x";|&\n\t\t\tfixed-link {\n\t\t\t\tspeed = <2500>;\n\t\t\t\tfull-duplex;\n\t\t\t};|
+			s|^$[[:space:]]*$};$|\t\t\tfixed-link {\n\t\t\t\tspeed = <2500>;\n\t\t\t\tfull-duplex;\n\t\t\t};\n\1};|
 		}' "$SFP_DTS"
 		echo "re-cs-08 sfp: patched to fixed-link 2500base-x"
-		sed -n '/ppe_sfp: port@2 {/,/};/p' "$SFP_DTS"
+		sed -n '/ppe_sfp: port@2 {/,/^[[:space:]]*};$/p' "$SFP_DTS"
 	fi
 else
 	echo "re-cs-08 sfp: dts or ppe_sfp node not found; skipping"
