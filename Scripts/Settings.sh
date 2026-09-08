@@ -91,3 +91,27 @@ if [[ "${WRT_TARGET^^}" == *"QUALCOMMBE"* ]]; then
 		echo "qualcommbe: ipq53xx.mk or jdcloud_re-cs-08 not found; skipping"
 	fi
 fi
+
+#RE-CS-08: SFP 口改为 fixed-link 2500base-x（猫棒是 2.5G，不需要热插拔）
+#背景：主线 sfp.c 把 ALCATELLUCENT 3FE46541AA quirk 成 2500BASEX-only；
+#      DTS 里的 qcom,sfp-force-sgmii 又把 PPE 口收窄成 SGMII-only，
+#      两者交集为空 → "unsupported SFP module: no common interface modes"，模块被拒。
+#做法：去掉 sfp 属性（绕开模块能力校验）+ fixed-link 固定 2.5G 全双工，不等 in-band 自协商。
+SFP_DTS="$(find ./target/linux/qualcommbe -name 'ipq5332-re-cs-08.dts' -print -quit 2>/dev/null)"
+if [ -n "$SFP_DTS" ] && grep -q 'ppe_sfp: port@2' "$SFP_DTS"; then
+	if sed -n '/ppe_sfp: port@2 {/,/};/p' "$SFP_DTS" | grep -q 'fixed-link'; then
+		echo "re-cs-08 sfp: fixed-link already present; skipping"
+	else
+		sed -i '/ppe_sfp: port@2 {/,/};/{
+			/managed = "in-band-status"/d
+			/qcom,sfp-force-sgmii/d
+			/sfp = <&sfp0>/d
+			s/phy-mode = ".*"/phy-mode = "2500base-x"/
+			s|phy-mode = "2500base-x";|&\n\t\t\tfixed-link {\n\t\t\t\tspeed = <2500>;\n\t\t\t\tfull-duplex;\n\t\t\t};|
+		}' "$SFP_DTS"
+		echo "re-cs-08 sfp: patched to fixed-link 2500base-x"
+		sed -n '/ppe_sfp: port@2 {/,/};/p' "$SFP_DTS"
+	fi
+else
+	echo "re-cs-08 sfp: dts or ppe_sfp node not found; skipping"
+fi
