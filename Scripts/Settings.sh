@@ -73,3 +73,16 @@ if [ -n "$DTS_FILE" ] && grep -q 'partname = "factory"' "$DTS_FILE"; then
 else
 	echo "re-cs-08 partname already patched or DTS not found"
 fi
+
+#RE-CS-08: 内核 FIT 压缩方式 gzip -> lzma
+#原因：KERNEL_SIZE=6144k，开启 BTF(daed 依赖) 后 gzip 压缩得到的 uImage.itb 约 7.9MB 超限
+if [[ "${WRT_TARGET^^}" == *"QUALCOMMBE"* ]]; then
+	IPQ53XX_MK="./target/linux/qualcommbe/image/ipq53xx.mk"
+	if [ -f "$IPQ53XX_MK" ] && grep -q '^define Device/jdcloud_re-cs-08$' "$IPQ53XX_MK"; then
+		sed -i '\#^define Device/jdcloud_re-cs-08$#,\#^endef$#s|call Device/FitImage)|call Device/FitImageLzma)|' "$IPQ53XX_MK"
+		echo "qualcommbe: re-cs-08 FIT compression -> lzma"
+		grep -n -A2 '^define Device/jdcloud_re-cs-08$' "$IPQ53XX_MK"
+	else
+		echo "qualcommbe: ipq53xx.mk or jdcloud_re-cs-08 not found; skipping"
+	fi
+fi
