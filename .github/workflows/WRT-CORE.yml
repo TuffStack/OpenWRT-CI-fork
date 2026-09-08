@@ -173,6 +173,12 @@ jobs:
           cd ./wrt/
 
           ./scripts/feeds update -a
+
+          # feeds 被 git clean 排除、且 feeds update 不会硬重置，需手动还原上次构建打的补丁
+          for FEED in ./feeds/*/; do
+            [ -d "$FEED/.git" ] && git -C "$FEED" checkout -- . || true
+          done
+
           ./scripts/feeds install -a
 
       - name: Custom Packages
