@@ -23,6 +23,10 @@ on:
         default: false
         required: false
         type: boolean
+      WRT_CLEAN:
+        required: false
+        default: false
+        type: boolean
 
 #CI权限
 permissions: write-all

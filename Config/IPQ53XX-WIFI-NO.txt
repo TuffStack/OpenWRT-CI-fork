@@ -3,18 +3,3 @@ CONFIG_TARGET_qualcommbe=y
 CONFIG_TARGET_qualcommbe_ipq53xx=y
 #设备列表
 CONFIG_TARGET_DEVICE_qualcommbe_ipq53xx_DEVICE_jdcloud_re-cs-08=y
-
-# Configuration for JDCloud RE-CS-08
-# Disable packages that may cause warnings when not needed
-CONFIG_PACKAGE_bmx7=n
-CONFIG_PACKAGE_bmx7-dnsupdate=n
-CONFIG_PACKAGE_bmx7-json=n
-CONFIG_PACKAGE_bmx7-uci-config=n
-CONFIG_PACKAGE_bmx7-iwinfo=n
-CONFIG_PACKAGE_bmx7-tun=n
-CONFIG_PACKAGE_babeld=n
-CONFIG_PACKAGE_dcwapd=n
-CONFIG_PACKAGE_luci-app-babeld=n
-CONFIG_PACKAGE_luci-app-bmx7=n
-CONFIG_PACKAGE_luci-app-dcwapd=n
-CONFIG_PACKAGE_prometheus-node-exporter-lua=n

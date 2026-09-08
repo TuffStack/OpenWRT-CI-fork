@@ -69,9 +69,6 @@ jobs:
     concurrency:
       group: wrt-selfhosted      # 全局唯一，所有构建排队执行
       cancel-in-progress: false
-    outputs:
-      cache_prefix: ${{steps.initialize-values.outputs.cache_prefix}}
-      cache_key: ${{steps.clone-code.outputs.cache_key}}
     steps:
       - name: Checkout Projects
         uses: actions/checkout@main
@@ -80,8 +77,19 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+          set -e
+          RUN_USER="$(id -un)"
           sudo mkdir -p "$WRT_ROOT/src" "$WRT_ROOT/dl" "$WRT_ROOT/ccache"
-          sudo chown -R "$USER:$USER" "$WRT_ROOT"
+          sudo chown -R "$RUN_USER:$(id -gn)" "$WRT_ROOT"
+          unset LD_LIBRARY_PATH LD_PRELOAD
+
+          # 基础工具自检：sed 挂掉会导致 prepare-tmpinfo 必失败
+          for t in sed find xargs awk grep; do
+            command -v "$t" > /dev/null || { echo "::error::$t missing"; exit 1; }
+          done
+          echo abc | sed 's/a/X/' | grep -q Xbc || {
+            echo "::error::sed broken (glibc mismatch)"; exit 1; }
+
           command -v ccache > /dev/null && ccache -M "$CCACHE_MAXSIZE" || true
           df -h "$WRT_ROOT"
 
@@ -127,7 +135,7 @@ jobs:
           fi
           
           # 清掉上次构建残留，但保留 feeds / staging_dir（工具链）
-          git clean -ffdx -e feeds
+          git clean -ffdx -e feeds -e staging_dir
           
           # 共享的下载目录与 ccache 目录（软链被 clean 掉了，重建即可）
           ln -sfn "$WRT_ROOT/dl"     "$SRC/dl"
@@ -147,16 +155,6 @@ jobs:
       - name: Check Scripts
         run: |
           find ./ -maxdepth 3 -type f -iregex ".*\(txt\|sh\)$" -exec dos2unix {} \; -exec chmod +x {} \;
-
-      - name: Restore Build Cache
-        id: cache-restore
-        if: ${{ !inputs.WRT_TEST }}
-        uses: actions/cache/restore@main
-        with:
-          key: ${{env.WRT_CACHE_KEY}}
-          restore-keys: ${{env.WRT_CACHE_PREFIX}}-
-          path: |
-            ./wrt/.ccache
 
       - name: Update Feeds
         run: |
@@ -183,6 +181,7 @@ jobs:
           fi
 
           $GITHUB_WORKSPACE/Scripts/Settings.sh
+          $GITHUB_WORKSPACE/Scripts/Kernel.sh    
 
           make defconfig -j$(nproc)
           if [[ "${WRT_CLEAN:-true}" == "true" ]]; then
@@ -202,14 +201,6 @@ jobs:
           cd ./wrt/
 
           make -j$(nproc) || make -j1 V=s
-
-      - name: Save Build Cache
-        if: ${{ !inputs.WRT_TEST && success() && steps.cache-restore.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@main
-        with:
-          key: ${{env.WRT_CACHE_KEY}}
-          path: |
-            ./wrt/.ccache
 
       - name: Machine Information
         run: |
@@ -244,7 +235,9 @@ jobs:
 
             find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
 
-            make clean -j$(nproc)
+            if [[ "${WRT_CLEAN:-true}" == "true" ]]; then
+              make clean -j$(nproc)
+            fi
           fi
 
       - name: Release Firmware
@@ -274,43 +267,3 @@ jobs:
 
             内核版本：${{env.WRT_KVER}}
             插件列表：${{env.WRT_LIST}}
-
-  cache-rollover:
-    name: Roll cache generations
-    needs: core
-    if: ${{ !inputs.WRT_TEST && needs.core.result == 'success' }}
-    runs-on: self-hosted
-    concurrency:
-      group: wrt-cache-rollover-${{github.ref}}-${{needs.core.outputs.cache_prefix}}
-      cancel-in-progress: false
-    env:
-      GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      GH_REPO: ${{github.repository}}
-      WRT_CACHE_PREFIX: ${{needs.core.outputs.cache_prefix}}
-      WRT_CACHE_KEY: ${{needs.core.outputs.cache_key}}
-    steps:
-      - name: Roll Build Cache
-        run: |
-          set -euo pipefail
-
-          CURRENT_CACHE_KEYS=$(gh cache list --repo "$GH_REPO" --key "$WRT_CACHE_KEY" --ref "$GITHUB_REF" --limit 100 --json key --jq '.[].key')
-          CURRENT_CACHE_FOUND=0
-          while IFS= read -r CACHE_KEY; do
-            if [ "$CACHE_KEY" = "$WRT_CACHE_KEY" ]; then
-              CURRENT_CACHE_FOUND=1
-              break
-            fi
-          done <<< "$CURRENT_CACHE_KEYS"
-
-          if [ "$CURRENT_CACHE_FOUND" -ne 1 ]; then
-            echo "skip cache rollover: current cache is not available yet"
-            exit 0
-          fi
-
-          gh cache list --repo "$GH_REPO" --key "$WRT_CACHE_PREFIX-" --ref "$GITHUB_REF" --limit 100 --json id,key --jq '.[] | [.id, .key] | @tsv' |
-            while IFS=$'\t' read -r CACHE_ID CACHE_KEY; do
-              [ -n "$CACHE_ID" ] || continue
-              [ "$CACHE_KEY" = "$WRT_CACHE_KEY" ] && continue
-              gh cache delete "$CACHE_ID" --repo "$GH_REPO" ||
-                echo "warning: failed to delete cache $CACHE_ID ($CACHE_KEY)"
-            done

@@ -1,0 +1,13 @@
+# 明确禁用：依赖缺失 / 与 dae 冲突
+CONFIG_PACKAGE_bmx7=n
+CONFIG_PACKAGE_bmx7-dnsupdate=n
+CONFIG_PACKAGE_bmx7-json=n
+CONFIG_PACKAGE_bmx7-uci-config=n
+CONFIG_PACKAGE_bmx7-iwinfo=n
+CONFIG_PACKAGE_bmx7-tun=n
+CONFIG_PACKAGE_babeld=n
+CONFIG_PACKAGE_dcwapd=n
+CONFIG_PACKAGE_luci-app-babeld=n
+CONFIG_PACKAGE_luci-app-bmx7=n
+CONFIG_PACKAGE_luci-app-dcwapd=n
+CONFIG_PACKAGE_prometheus-node-exporter-lua=n
