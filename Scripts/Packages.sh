@@ -3,11 +3,13 @@
 # Copyright (C) 2026 VIKINGYFY
 
 PKG_CACHE="${WRT_PKG_CACHE:-/mnt/wrt/pkgcache}"
+PKG_SRC_DIR=""   # 由 clone_or_update 写入，避免用 $(...) 捕获从而混入诊断输出
 
-# 持久化克隆：有则 fetch+reset，无则 clone；返回缓存目录路径
+# 持久化克隆：有则 fetch+reset，无则 clone；结果路径写入全局变量 PKG_SRC_DIR
 clone_or_update() {
-	local REPO="$1" BRANCH="$2" NAME="$3"
+	local REPO="$1" BRANCH="$2"
 	local CACHE_DIR="$PKG_CACHE/${REPO//\//__}"
+	PKG_SRC_DIR="$CACHE_DIR"
 	if [ -d "$CACHE_DIR/.git" ]; then
 		echo "Update cache: $REPO"
 		git -C "$CACHE_DIR" fetch --depth=1 origin "$BRANCH" && \
@@ -20,27 +22,21 @@ clone_or_update() {
 		git clone --depth=1 --single-branch --branch "$BRANCH" \
 			"https://github.com/$REPO.git" "$CACHE_DIR"
 	fi
-	echo "$CACHE_DIR"
 }
 
-#安装和更新软件包
 UPDATE_PACKAGE() {
 	local PKG_NAME=$1
 	local PKG_REPO=$2
 	local PKG_BRANCH=$3
 	local PKG_SPECIAL=$4
-	local PKG_LIST=("$PKG_NAME" $5)  # 第5个参数为自定义名称列表
+	local PKG_LIST=("$PKG_NAME" $5)
 	local REPO_NAME=${PKG_REPO#*/}
 
 	echo " "
 
 	# 删除本地可能存在的不同名称的软件包
 	for NAME in "${PKG_LIST[@]}"; do
-		# 查找匹配的目录
-		echo "Search directory: $NAME"
 		local FOUND_DIRS=$(find ../feeds/luci/ ../feeds/packages/ -maxdepth 3 -type d -iname "*$NAME*" 2>/dev/null)
-
-		# 删除找到的目录
 		if [ -n "$FOUND_DIRS" ]; then
 			while read -r DIR; do
 				rm -rf "$DIR"
@@ -51,11 +47,10 @@ UPDATE_PACKAGE() {
 		fi
 	done
 
-	# 克隆 GitHub 仓库
-	local SRC_DIR
-	SRC_DIR=$(clone_or_update "$PKG_REPO" "$PKG_BRANCH" "$REPO_NAME")
+	# 从持久缓存取源码（有则更新，无则克隆），再本地复制进当前目录
+	clone_or_update "$PKG_REPO" "$PKG_BRANCH"
+	local SRC_DIR="$PKG_SRC_DIR"
 
-	# 处理克隆的仓库
 	if [[ "$PKG_SPECIAL" == "pkg" ]]; then
 		find "$SRC_DIR"/*/ -maxdepth 3 -type d -iname "*$PKG_NAME*" -prune -exec cp -rf {} ./ \;
 	elif [[ "$PKG_SPECIAL" == "name" ]]; then
