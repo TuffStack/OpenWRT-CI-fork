@@ -1,15 +1,13 @@
-#科学插件调整
-CONFIG_PACKAGE_luci-app-homeproxy=n
+#科学插件调整（homeproxy / nikki 由各固件配置文件单独开启）
 CONFIG_PACKAGE_luci-app-openclash=n
-#daed(eBPF，依赖内核 BTF；勿关 CONFIG_KERNEL_DEBUG_INFO / CONFIG_KERNEL_DEBUG_INFO_BTF)
-CONFIG_PACKAGE_daed=y
-CONFIG_PACKAGE_luci-app-daed=y
-CONFIG_PACKAGE_daed-geoip=y
-CONFIG_PACKAGE_daed-geosite=y
-#nikki(mihomo)
-CONFIG_PACKAGE_nikki=n
-CONFIG_PACKAGE_luci-app-nikki=n
-CONFIG_PACKAGE_mihomo-alpha=n
+# ===== Docker（全局默认携带）=====
+CONFIG_PACKAGE_dockerd=y
+CONFIG_PACKAGE_docker=y
+CONFIG_PACKAGE_luci-app-dockerman=y
+CONFIG_PACKAGE_luci-lib-docker=y
+# ===== MosDNS（全局默认携带）=====
+CONFIG_PACKAGE_mosdns=y
+CONFIG_PACKAGE_luci-app-mosdns=y
 #增加插件
 CONFIG_PACKAGE_luci-app-autoreboot=y
 CONFIG_PACKAGE_luci-app-mini-diskmanager=y
@@ -22,13 +20,20 @@ CONFIG_PACKAGE_easytier=n
 CONFIG_PACKAGE_luci-app-easytier=n
 CONFIG_PACKAGE_smartdns=n
 CONFIG_PACKAGE_luci-app-smartdns=n
-#删除插件
+#删除插件（含依赖缺失/无用的 feed 包，避免被拉入固件）
 CONFIG_PACKAGE_luci-app-attendedsysupgrade=n
 CONFIG_PACKAGE_luci-app-wol=n
 CONFIG_PACKAGE_luci-app-gecoosac=n
 CONFIG_PACKAGE_luci-app-adguardhome=n
 CONFIG_PACKAGE_luci-app-samba4=n
 CONFIG_PACKAGE_kmod-wireguard=n
+CONFIG_PACKAGE_bmx7=n
+CONFIG_PACKAGE_babeld=n
+CONFIG_PACKAGE_dcwapd=n
+CONFIG_PACKAGE_luci-app-babeld=n
+CONFIG_PACKAGE_luci-app-bmx7=n
+CONFIG_PACKAGE_luci-app-dcwapd=n
+CONFIG_PACKAGE_prometheus-node-exporter-lua=n
 #参数调整
 CONFIG_CCACHE=y
 CONFIG_CCACHE_DIR="/mnt/wrt/ccache"
@@ -40,19 +45,10 @@ CONFIG_TARGET_ROOTFS_INITRAMFS=n
 # 编译器优化级别：-O2 → -Os，全局生效
 CONFIG_KERNEL_CC_OPTIMIZE_FOR_PERFORMANCE=n
 CONFIG_KERNEL_CC_OPTIMIZE_FOR_SIZE=y
-# ===== dae / eBPF / BTF 支持（daed 必需，勿删）=====
+# ===== Docker cgroup / eBPF 支持 =====
 CONFIG_KERNEL_CGROUPS=y
 CONFIG_KERNEL_CGROUP_BPF=y
-CONFIG_KERNEL_KPROBES=n
-CONFIG_KERNEL_KPROBE_EVENTS=n
 CONFIG_KERNEL_BPF_EVENTS=y
-CONFIG_KERNEL_DEBUG_INFO=y
-CONFIG_KERNEL_DEBUG_INFO_REDUCED=n
-CONFIG_KERNEL_DEBUG_INFO_BTF=y
-CONFIG_KERNEL_XDP_SOCKETS=y
-CONFIG_PACKAGE_kmod-sched-core=y
-CONFIG_PACKAGE_kmod-sched-bpf=y
-CONFIG_PACKAGE_kmod-xdp-sockets-diag=y
 #内核调整
 CONFIG_PACKAGE_qmodem=n
 CONFIG_PACKAGE_kmod-bonding=n
@@ -82,33 +78,6 @@ CONFIG_PACKAGE_kmod-nft-xfrm=n
 CONFIG_PACKAGE_kmod-ovpn-backports=n
 CONFIG_PACKAGE_kmod-tun=y
 CONFIG_PACKAGE_kmod-veth=y
-#无USB(本机 DTS 无 usb 节点)
-CONFIG_PACKAGE_kmod-usb-core=n
-CONFIG_PACKAGE_kmod-usb3=n
-CONFIG_PACKAGE_kmod-usb-ohci=n
-CONFIG_PACKAGE_kmod-usb-uhci=n
-CONFIG_PACKAGE_kmod-usb-xhci=n
-CONFIG_PACKAGE_kmod-usb-dwc3=n
-CONFIG_PACKAGE_kmod-usb-storage=n
-CONFIG_PACKAGE_kmod-usb-storage-extras=n
-CONFIG_PACKAGE_kmod-usb-storage-uas=n
-CONFIG_PACKAGE_kmod-usb-net=n
-CONFIG_PACKAGE_kmod-usb-net-asix=n
-CONFIG_PACKAGE_kmod-usb-net-asix-ax88179=n
-CONFIG_PACKAGE_kmod-usb-net-cdc-eem=n
-CONFIG_PACKAGE_kmod-usb-net-cdc-ether=n
-CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=n
-CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=n
-CONFIG_PACKAGE_kmod-usb-net-cdc-subset=n
-CONFIG_PACKAGE_kmod-usb-net-huawei-cdc-ncm=n
-CONFIG_PACKAGE_kmod-usb-net-ipheth=n
-CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=n
-CONFIG_PACKAGE_kmod-usb-net-qmi-wwan-fibocom=n
-CONFIG_PACKAGE_kmod-usb-net-qmi-wwan-quectel=n
-CONFIG_PACKAGE_kmod-usb-net-rndis=n
-CONFIG_PACKAGE_kmod-usb-net-rtl8150=n
-CONFIG_PACKAGE_kmod-usb-net-rtl8152=n
-CONFIG_PACKAGE_kmod-usb-net-sierrawireless=n
 #组件调整
 CONFIG_PACKAGE_autocore=y
 CONFIG_PACKAGE_cfdisk=n
@@ -145,3 +114,85 @@ CONFIG_PACKAGE_usb-modeswitch=n
 CONFIG_PACKAGE_usbmuxd=n
 CONFIG_PACKAGE_usbutils=n
 CONFIG_PACKAGE_xz-utils=n
+# ===== IPQ53xx RE-CS-08 本机硬件（eMMC + QCA8386 交换 + SFP 2500base-x + PCIe1 NVMe，无无线/无USB/NAND）=====
+CONFIG_PACKAGE_kmod-nvme=y
+CONFIG_PACKAGE_block-mount=y
+CONFIG_PACKAGE_kmod-fs-ext4=y
+CONFIG_PACKAGE_kmod-fs-btrfs=y
+CONFIG_PACKAGE_automount=y
+CONFIG_PACKAGE_blkid=y
+CONFIG_PACKAGE_lsblk=y
+CONFIG_PACKAGE_fdisk=y
+CONFIG_PACKAGE_smartmontools=y
+CONFIG_PACKAGE_kmod-sfp=y
+CONFIG_PACKAGE_ethtool=y
+CONFIG_PACKAGE_kmod-ata-ahci=n
+CONFIG_PACKAGE_kmod-ata-core=n
+CONFIG_PACKAGE_kmod-sound-core=n
+#无USB(本机 DTS 无 usb 节点)
+CONFIG_PACKAGE_kmod-usb-core=n
+CONFIG_PACKAGE_kmod-usb3=n
+CONFIG_PACKAGE_kmod-usb-audio=n
+CONFIG_PACKAGE_kmod-usb-ohci=n
+CONFIG_PACKAGE_kmod-usb-uhci=n
+CONFIG_PACKAGE_kmod-usb-xhci=n
+CONFIG_PACKAGE_kmod-usb-dwc3=n
+CONFIG_PACKAGE_kmod-usb-storage=n
+CONFIG_PACKAGE_kmod-usb-storage-extras=n
+CONFIG_PACKAGE_kmod-usb-storage-uas=n
+CONFIG_PACKAGE_kmod-usb-net=n
+CONFIG_PACKAGE_kmod-usb-net-asix=n
+CONFIG_PACKAGE_kmod-usb-net-asix-ax88179=n
+CONFIG_PACKAGE_kmod-usb-net-cdc-eem=n
+CONFIG_PACKAGE_kmod-usb-net-cdc-ether=n
+CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=n
+CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=n
+CONFIG_PACKAGE_kmod-usb-net-cdc-subset=n
+CONFIG_PACKAGE_kmod-usb-net-huawei-cdc-ncm=n
+CONFIG_PACKAGE_kmod-usb-net-ipheth=n
+CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=n
+CONFIG_PACKAGE_kmod-usb-net-qmi-wwan-fibocom=n
+CONFIG_PACKAGE_kmod-usb-net-qmi-wwan-quectel=n
+CONFIG_PACKAGE_kmod-usb-net-rndis=n
+CONFIG_PACKAGE_kmod-usb-net-rtl8150=n
+CONFIG_PACKAGE_kmod-usb-net-rtl8152=n
+CONFIG_PACKAGE_kmod-usb-net-sierrawireless=n
+# ===== IPQ53xx 内核瘦身：KERNEL_SIZE = 6144k(6291456) =====
+# 必须保留：PCI/PCIE_QCOM(NVMe)、MMC_SDHCI_MSM(系统盘)、I2C_QUP(SFP)、
+#   NET_DSA_QCA8K / QCA83XX_PHY / QCA808X_PHY / SFP / PHY_QCOM_QMP_PCIE(网络)、NVMEM*(MAC/ART)
+CONFIG_KERNEL_VIRTIO=n
+CONFIG_KERNEL_BLK_DEV_LOOP=y
+CONFIG_KERNEL_F2FS_FS=n
+CONFIG_KERNEL_NET_SELFTESTS=n
+CONFIG_KERNEL_COREDUMP=n
+CONFIG_KERNEL_DEV_COREDUMP=n
+CONFIG_KERNEL_ALLOW_DEV_COREDUMP=n
+CONFIG_KERNEL_LEDS_TLC591XX=n
+#eMMC 启动，无 NAND / SPI-NOR / UBI
+CONFIG_KERNEL_MTD_UBI=n
+CONFIG_KERNEL_MTD_UBI_BLOCK=n
+CONFIG_KERNEL_MTD_RAW_NAND=n
+CONFIG_KERNEL_MTD_NAND_QCOM=n
+CONFIG_KERNEL_MTD_SPI_NOR=n
+CONFIG_KERNEL_MTD_SPI_NAND=n
+CONFIG_KERNEL_MTD_QCOMSMEM_PARTS=n
+CONFIG_KERNEL_UBIFS_FS=n
+# --- 仍超限时逐行取消注释（收益小）---
+#CONFIG_KERNEL_FRAME_POINTER=n
+#CONFIG_KERNEL_DEBUG_BUGVERBOSE=n
+#CONFIG_KERNEL_MAGIC_SYSRQ=n
+#CONFIG_KERNEL_ARM64_SVE=n
+#CONFIG_KERNEL_REMOTEPROC=n
+#CONFIG_KERNEL_REMOTEPROC_CDEV=n
+#CONFIG_KERNEL_QCOM_RPROC_COMMON=n
+#CONFIG_KERNEL_QCOM_Q6V5_COMMON=n
+#CONFIG_KERNEL_QCOM_Q6V5_WCSS=n
+#CONFIG_KERNEL_QCOM_Q6V5_WCSS_SEC=n
+#CONFIG_KERNEL_QCOM_MDT_LOADER=n
+#CONFIG_KERNEL_QCOM_PIL_INFO=n
+# --- 激进（影响排障，最后手段）---
+#CONFIG_KERNEL_KALLSYMS=n
+#CONFIG_KERNEL_KALLSYMS_UNCOMPRESSED=n
+#CONFIG_KERNEL_SCSI=n
+#CONFIG_KERNEL_BLK_DEV_SD=n
+#CONFIG_KERNEL_PSTORE=n

@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: MIT
-# Scripts/Kernel.sh —— 为 dae 打开 eBPF / BTF 相关内核选项
+# Scripts/Kernel.sh —— 打开 内核选项
 # 执行目录：wrt/
 
 set -e
@@ -52,7 +52,7 @@ echo "kernel: 原生内核符号已写入 $KCONF"
 grep -E '^CONFIG_(BPF|NET_INGRESS|NET_EGRESS|NET_CLS_ACT|NET_SCH_INGRESS|NET_CLS_BPF)' "$KCONF" || true
 
 
-# ===== Docker 原生内核符号（仅 -docker 配置注入）=====
+# ===== Docker 原生内核符号（全局注入）=====
 while IFS= read -r LINE; do
 	NAME="${LINE%%=*}"
 	if grep -qE "^${NAME}=|^# ${NAME} is not set" "$KCONF"; then

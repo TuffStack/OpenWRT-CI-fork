@@ -48,8 +48,11 @@ https://drive.wrt.moe/uboot/mediatek
 
 固件信息里的时间为编译开始的时间，方便核对上游源码提交时间。
 
-MEDIATEK系列、QUALCOMMAX系列、ROCKCHIP系列、X86系列。
+当前仅编译 IPQ53XX(qualcommbe / JDCloud RE-CS-08) 系列，输出两个固件：
+- IPQ53XX-WIFI-NO-homeproxy：默认携带 homeproxy
+- IPQ53XX-WIFI-NO-NIKKI：默认携带 nikki(mihomo)
 
+全系默认带 Docker 与 MosDNS。
 # 目录简要说明
 
 workflows——自定义CI配置

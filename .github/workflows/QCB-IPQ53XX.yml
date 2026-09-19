@@ -39,7 +39,7 @@ jobs:
       fail-fast: false
       #max-parallel: 3
       matrix:
-        CONFIG: [IPQ53XX-WIFI-NO, IPQ53XX-WIFI-NO-DOCKER]
+        CONFIG: [IPQ53XX-WIFI-NO-homeproxy, IPQ53XX-WIFI-NO-NIKKI]
         SOURCE: [VIKINGYFY/immortalwrt]
         BRANCH: [owrt]
 
