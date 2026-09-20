@@ -184,15 +184,9 @@ jobs:
           done
           [ "$FOUND_STALE" = 1 ] || echo "phylink self-heal: no stale 737-10 patch found (ok)"
 
-          # qualcommbe 0609 是分支作者基于 6.18.51 的私有补丁；6.18.52 里
-          # nf_flow_queue_xmit() 重构为 struct nf_flow_xmit 签名导致 3/7 悬挂。
-          # 用仓内 rebase 版（Patches/qualcommbe/）替换：仅当检测到旧签名
-          # 的坏版本时替换；作者上游自行修复后特征消失，此逻辑自动失效。
-          QBE0609="target/linux/qualcommbe/patches-6.18/0609-net-clear-routed-dsa-offload-mark.patch"
-          if [ -f "$QBE0609" ] && grep -q 'const struct flow_offload_tuple_rhash \*tuplehash' "$QBE0609"; then
-            echo "rebasing qualcommbe 0609 patch onto 6.18.52"
-            cp -f "$GITHUB_WORKSPACE/Patches/qualcommbe/0609-net-clear-routed-dsa-offload-mark-6.18.52.patch" "$QBE0609"
-          fi
+          # qualcommbe 私有补丁 bump 失配护栏（带特征守卫，见 Scripts/PatchFix.sh）；
+          # 此时 Check Scripts 尚未执行 chmod，用 bash 显式调用规避权限位
+          bash "$GITHUB_WORKSPACE/Scripts/PatchFix.sh"
 
           # 共享目录软链（若被 clean 掉则重建）
           ln -sfn "$WRT_ROOT/dl"     "$SRC/dl"
