@@ -31,6 +31,7 @@ UPDATE_PACKAGE() {
 	local PKG_SPECIAL=$4
 	local PKG_LIST=("$PKG_NAME" $5)
 	local REPO_NAME=${PKG_REPO#*/}
+	local REPO_PATH="./package/$REPO_NAME"
 
 	echo " "
 
@@ -38,7 +39,7 @@ UPDATE_PACKAGE() {
 	for NAME in "${PKG_LIST[@]}"; do
 		# 查找匹配的目录
 		echo "Search directory: $NAME"
-		local FOUND_DIRS=$(find ../feeds/luci/ ../feeds/packages/ -maxdepth 3 -type d -iname "*$NAME*" 2>/dev/null)
+		local FOUND_DIRS=$(find ./feeds/luci/ ./feeds/packages/ -maxdepth 3 -type d -iname "*$NAME*" 2>/dev/null)
 
 		# 删除找到的目录
 		if [ -n "$FOUND_DIRS" ]; then
@@ -51,16 +52,16 @@ UPDATE_PACKAGE() {
 		fi
 	done
 
-	# 从持久缓存取源码（有则更新，无则克隆），再本地复制进当前目录
+	# 从持久缓存取源码（有则更新，无则克隆），再本地复制进 package 目录
 	clone_or_update "$PKG_REPO" "$PKG_BRANCH"
 	local SRC_DIR="$PKG_SRC_DIR"
 
 	if [[ "$PKG_SPECIAL" == "pkg" ]]; then
-		find "$SRC_DIR"/*/ -maxdepth 3 -type d -iname "*$PKG_NAME*" -prune -exec cp -rf {} ./ \;
+		find "$SRC_DIR"/*/ -maxdepth 3 -type d -iname "*$PKG_NAME*" -prune -exec cp -rf {} ./package \;
 	elif [[ "$PKG_SPECIAL" == "name" ]]; then
-		cp -rf "$SRC_DIR" "./$PKG_NAME"
+		cp -rf "$SRC_DIR" "./package/$PKG_NAME"
 	else
-		cp -rf "$SRC_DIR" "./$REPO_NAME"
+		cp -rf "$SRC_DIR" "./package/$REPO_NAME"
 	fi
 }
 
@@ -92,7 +93,7 @@ UPDATE_PACKAGE "airpi3000m" "LianXia233/luci-app-airpi3000m-fancontrol" "main"
 UPDATE_VERSION() {
 	local PKG_NAME=$1
 	local PKG_MARK=${2:-false}
-	local PKG_FILES=$(find ./ ../feeds/packages/ -maxdepth 3 -type f -wholename "*/$PKG_NAME/Makefile")
+	local PKG_FILES=$(find ./ ./feeds/packages/ -maxdepth 3 -type f -wholename "*/$PKG_NAME/Makefile")
 
 	if [ -z "$PKG_FILES" ]; then
 		echo "$PKG_NAME not found!"
