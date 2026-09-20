@@ -288,10 +288,14 @@ jobs:
           fi
 
       - name: Release Firmware
+        # 上传走 GitHub 资产端点，裸金属 runner 偶发 TLS 闪断；步骤级重试兜底，
+        # overwrite_files 保证重试时已传过的同名资产被覆盖而非报错，保持幂等
         uses: softprops/action-gh-release@master
+        retries: 3
         with:
           tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
           files: ./wrt/upload/*.*
+          overwrite_files: true
           body: |
             这是个平台固件包，内含多个设备！
             请注意选择你需要的设备固件！
