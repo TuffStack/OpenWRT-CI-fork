@@ -5,22 +5,33 @@
 PKG_CACHE="${WRT_PKG_CACHE:-/mnt/wrt/pkgcache}"
 PKG_SRC_DIR=""   # 由 clone_or_update 写入，避免用 $(...) 捕获从而混入诊断输出
 
-# 持久化克隆：有则 fetch+reset，无则 clone；结果路径写入全局变量 PKG_SRC_DIR
+# 共用克隆逻辑：失败硬中止（exit 1 使构建步骤失败，避免插件静默缺失）
+do_clone() {   # $1=REPO $2=BRANCH $3=DEST
+	mkdir -p "$(dirname "$3")"
+	rm -rf "$3"
+	git clone --depth=1 --single-branch --branch "$2" "https://github.com/$1.git" "$3" \
+		|| { echo "::error::clone failed: $1"; exit 1; }
+}
+
+# 持久化克隆：有则 fetch+reset+clean，无则 clone；结果路径写入全局变量 PKG_SRC_DIR
 clone_or_update() {
 	local REPO="$1" BRANCH="$2"
 	local CACHE_DIR="$PKG_CACHE/${REPO//\//__}"
 	PKG_SRC_DIR="$CACHE_DIR"
 	if [ -d "$CACHE_DIR/.git" ]; then
 		echo "Update cache: $REPO"
-		git -C "$CACHE_DIR" fetch --depth=1 origin "$BRANCH" && \
-			git -C "$CACHE_DIR" reset --hard "origin/$BRANCH" || \
-			echo "cache update failed for $REPO, will re-clone"
+		# fetch/reset/clean 任一失败：退回全量重克隆，避免旧缓存被复制进固件
+		if git -C "$CACHE_DIR" fetch --depth=1 origin "$BRANCH" \
+			&& git -C "$CACHE_DIR" reset --hard FETCH_HEAD \
+			&& git -C "$CACHE_DIR" clean -fdx; then
+			:
+		else
+			echo "cache update failed for $REPO, re-cloning"
+			do_clone "$REPO" "$BRANCH" "$CACHE_DIR"
+		fi
 	else
 		echo "Clone cache: $REPO"
-		mkdir -p "$PKG_CACHE"
-		rm -rf "$CACHE_DIR"
-		git clone --depth=1 --single-branch --branch "$BRANCH" \
-			"https://github.com/$REPO.git" "$CACHE_DIR"
+		do_clone "$REPO" "$BRANCH" "$CACHE_DIR"
 	fi
 }
 

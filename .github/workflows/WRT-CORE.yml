@@ -166,6 +166,24 @@ jobs:
             -e feeds -e staging_dir -e build_dir -e tmp -e logs -e bin \
             -e dl -e .ccache -e key-build -e key-build.pub -e key-build.ucert
 
+          # 已知残留内核补丁自愈：上游重做 fwnode PCS 系列后，737-02 已在
+          # phylink_create() 时链接 PCS list，旧 737-10 "link before initial
+          # config" 被废弃；但 owrt 分支合并时漏删，其 hunk2 要删的代码块在
+          # 新 phylink.c 已不存在，打补丁必冲突（kernel-headers 编译中断）。
+          # 仅当同目录 737-02 确为新版时才移除；内核升代后 glob 扫所有
+          # pending-* 目录仍生效，条件不成立时输出诊断便于排障。
+          FOUND_STALE=0
+          for STALE10 in target/linux/generic/pending-*/737-10-net-phylink-link-the-PCS-list-*.patch; do
+            [ -f "$STALE10" ] || continue
+            FOUND_STALE=1
+            PENDIR="${STALE10%/*}"
+            if grep -qs 'Fill the PCS' "$PENDIR"/737-02-*.patch; then
+              echo "removing superseded phylink patch: ${STALE10##*/}"
+              rm -f "$STALE10"
+            fi
+          done
+          [ "$FOUND_STALE" = 1 ] || echo "phylink self-heal: no stale 737-10 patch found (ok)"
+
           # 共享目录软链（若被 clean 掉则重建）
           ln -sfn "$WRT_ROOT/dl"     "$SRC/dl"
           ln -sfn "$WRT_ROOT/ccache" "$SRC/.ccache"
