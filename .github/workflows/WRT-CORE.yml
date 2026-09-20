@@ -92,9 +92,23 @@ jobs:
         run: |
           set -e
           RUN_USER="$(id -un)"
+          RUN_GROUP="$(id -gn)"
           sudo mkdir -p "$WRT_ROOT/src" "$WRT_ROOT/dl" "$WRT_ROOT/ccache" "$WRT_ROOT/go"
-          sudo chown -R "$RUN_USER:$(id -gn)" "$WRT_ROOT"
+          # 裸金属持久化缓存目录可达几十 GB，递归 chown -R 每次要扫描整棵树；
+          # 仅对顶层目录修正属主，子目录由 runner 用户自行创建，天然归属正确
+          for DIR in "$WRT_ROOT" "$WRT_ROOT/src" "$WRT_ROOT/dl" "$WRT_ROOT/ccache" "$WRT_ROOT/go"; do
+            [ "$(stat -c %U "$DIR")" = "$RUN_USER" ] || sudo chown "$RUN_USER:$RUN_GROUP" "$DIR"
+          done
           unset LD_LIBRARY_PATH LD_PRELOAD
+
+          # Debian 宿主机依赖自检：缺工具时提前告警，避免编译中后期深处失败浪费缓存
+          DEPS_MISSING=""
+          for t in git ccache g++ make file python3 jq dos2unix; do
+            command -v "$t" > /dev/null || DEPS_MISSING="$DEPS_MISSING $t"
+          done
+          if [ -n "$DEPS_MISSING" ]; then
+            echo "::warning::缺少编译依赖:$DEPS_MISSING (Debian: sudo apt install -y git ccache build-essential file python3 jq dos2unix)"
+          fi
 
           # 基础工具自检：sed 挂掉会导致 prepare-tmpinfo 必失败
           for t in sed find xargs awk grep; do
@@ -214,7 +228,8 @@ jobs:
         run: |
           cd ./wrt/
 
-          make download -j$(nproc)
+          # 并行下载偶发失败时串行重试一次，dl/ 持久缓存命中后重试成本极低
+          make download -j$(nproc) || make download -j1
 
       - name: Compile Firmware
         if: ${{ !inputs.WRT_TEST }}
@@ -249,7 +264,7 @@ jobs:
 
       - name: Package Firmware
         run: |
-          cd ./wrt/ && mkdir ./upload/
+          cd ./wrt/ && mkdir -p ./upload/
 
           cp -f ./.config ./upload/Config-"$WRT_CONFIG"-"$WRT_INFO"-"$WRT_BRANCH"-"$WRT_DATE".txt
 
@@ -267,10 +282,9 @@ jobs:
             done
 
             find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
-
-            if [[ "${WRT_CLEAN:-false}" == "true" ]]; then
-              make clean -j$(nproc)
-            fi
+            # 注意：这里不再做构建后的 make clean ——
+            # 若上次开了 WRT_CLEAN，构建前的 clean 已达成全量重编目的；
+            # 构建后再 clean 会把本次的热缓存抹掉，导致下次构建也从头重编
           fi
 
       - name: Release Firmware
