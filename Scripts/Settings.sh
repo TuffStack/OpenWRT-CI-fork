@@ -9,10 +9,11 @@ sed -i "s/luci-theme-bootstrap/luci-theme-$WRT_THEME/g" $(find ./feeds/luci/coll
 #修改immortalwrt.lan关联IP
 sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $(find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js")
 #添加编译日期标识
+#注：feeds 每次构建都会 git checkout 还原 10_system.js，故直接注入即可（无需去重）
 STATUS_JS=$(find ./feeds/luci/modules/luci-mod-status/ -type f -name "10_system.js" | head -1)
 if [ -n "$STATUS_JS" ]; then
-	sed -i -E "s@[+] $' / $WRT_MARK-[0-9.]+-[0-9.:]+'$@@g" "$STATUS_JS"
-	sed -i "s/($luciversion || ''$)/(\1) + (' \/ $WRT_MARK-$WRT_DATE')/g" "$STATUS_JS"
+	#在 (luciversion || '') 之后追加 " / 标记-日期"；用 # 作分隔符避免转义斜杠，且不使用反向引用
+	sed -i "s#(luciversion || '')#(luciversion || '') + (' / ${WRT_MARK}-${WRT_DATE}')#g" "$STATUS_JS"
 	grep -n "luciversion || ''" "$STATUS_JS"
 fi
 
@@ -72,12 +73,35 @@ fi
 #代价：失去 SFP 框架的模块 EEPROM/DDMI 在位管理(对常驻猫棒无影响)，换取 WAN 正常链路。
 if [ -n "$DTS_FILE" ] && grep -q 'ppe_sfp' "$DTS_FILE" \
 	&& grep -q 'managed = "in-band-status"' "$DTS_FILE"; then
-	sed -i \
-		-e 's#^\([[:space:]]*\)managed = "in-band-status";#\1fixed-link {\n\1\tspeed = <2500>;\n\1\tfull-duplex;\n\1};#' \
-		-e '/^[[:space:]]*sfp = <&sfp0>;[[:space:]]*$/d' \
-		"$DTS_FILE"
+	#1) 删除 in-band 自协商与 sfp 句柄两行；2) 在 ppe_sfp 节点收尾 }; 之前插入 fixed-link 子节点
+	#  (DTC 要求属性必须排在子节点之前，故 fixed-link 必须放在节点所有属性之后)
+	sed -i -e '/^[[:space:]]*managed = "in-band-status";[[:space:]]*$/d' \
+		-e '/^[[:space:]]*sfp = <&sfp0>;[[:space:]]*$/d' "$DTS_FILE"
+	awk '
+		BEGIN{ inblk=0; depth=0 }
+		{
+			if(!inblk){
+				print
+				if($0 ~ /ppe_sfp: port@2/){ inblk=1; depth=1 }
+				next
+			}
+			tmp=$0
+			o=gsub(/\{/,"{",tmp); c=gsub(/\}/,"}",tmp)
+			depth += o - c
+			if(depth<=0){
+				print "\t\t\tfixed-link {"
+				print "\t\t\t\tspeed = <2500>;"
+				print "\t\t\t\tfull-duplex;"
+				print "\t\t\t};"
+				print
+				inblk=0
+				next
+			}
+			print
+		}
+	' "$DTS_FILE" > "$DTS_FILE.tmp" && mv -f "$DTS_FILE.tmp" "$DTS_FILE"
 	echo "re-cs-08 SFP patched to fixed-link (in-band autoneg workaround)"
-	grep -n -A4 'ppe_sfp' "$DTS_FILE"
+	grep -n -A30 'ppe_sfp: port@2' "$DTS_FILE"
 else
 	echo "re-cs-08 SFP already fixed-link or pattern not found; skipping"
 fi
