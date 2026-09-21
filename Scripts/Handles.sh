@@ -27,17 +27,6 @@ if [ -d "$PACKAGE_PATH/luci-app-aurora-config" ]; then
 	fi
 fi
 
-#修改mini-diskmanager菜单位置
-if [ -d "$PACKAGE_PATH/luci-app-mini-diskmanager" ]; then
-	echo " "
-	if sed -i "s/services/system/g" \
-		"$PACKAGE_PATH/luci-app-mini-diskmanager/luci-app-mini-diskmanager/root/usr/share/luci/menu.d/luci-app-mini-diskmanager.json"; then
-		echo "mini-diskmanager has been fixed!"
-	else
-		echo "mini-diskmanager fix failed; continuing!"
-	fi
-fi
-
 LUCKY_VER="${LUCKY_VER:-3.0.0}"
 LUCKY_BETA="${LUCKY_BETA:-beta8}"
 LUCKY_TAG="${LUCKY_TAG:-xiaojv_waf}"
