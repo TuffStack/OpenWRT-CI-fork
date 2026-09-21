@@ -63,6 +63,25 @@ else
 	echo "re-cs-08 partname already patched or DTS not found"
 fi
 
+#RE-CS-08: SFP(WAN) 猫棒 2500base-x 链路无法 up 的规避
+#根因：上游内核 phylink/SFP 变更后，sfp 端口 managed="in-band-status" 会让 phylink
+#以 in-band(带内自协商) 方式配置 2500base-x；而高通 PCS 对 2500BASEX 仅允许禁用带内，
+#于是报 "autoneg setting not compatible with PCS"，链路反复重配且永不 carrier up，
+#导致无法拨号(与 openwrt#21434 同族回归；DTS 未变、纯内核 bump 触发)。
+#规避：把 sfp 端口改成像同级 switch 端口那样的 fixed-link(2500 全双工)，绕开带内协商。
+#代价：失去 SFP 框架的模块 EEPROM/DDMI 在位管理(对常驻猫棒无影响)，换取 WAN 正常链路。
+if [ -n "$DTS_FILE" ] && grep -q 'ppe_sfp' "$DTS_FILE" \
+	&& grep -q 'managed = "in-band-status"' "$DTS_FILE"; then
+	sed -i \
+		-e 's#^\([[:space:]]*\)managed = "in-band-status";#\1fixed-link {\n\1\tspeed = <2500>;\n\1\tfull-duplex;\n\1};#' \
+		-e '/^[[:space:]]*sfp = <&sfp0>;[[:space:]]*$/d' \
+		"$DTS_FILE"
+	echo "re-cs-08 SFP patched to fixed-link (in-band autoneg workaround)"
+	grep -n -A4 'ppe_sfp' "$DTS_FILE"
+else
+	echo "re-cs-08 SFP already fixed-link or pattern not found; skipping"
+fi
+
 #RE-CS-08: 内核 FIT 压缩方式 gzip -> lzma
 #原因：KERNEL_SIZE=6144k，gzip 压缩得到的 uImage.itb 可能超限，改用 lzma 进一步压缩体积
 if [[ "${WRT_TARGET^^}" == *"QUALCOMMBE"* ]]; then
