@@ -27,23 +27,23 @@ if [ -d "$PACKAGE_PATH/luci-app-aurora-config" ]; then
 	fi
 fi
 
-LUCKY_VER="${LUCKY_VER:-3.0.0}"
-LUCKY_BETA="${LUCKY_BETA:-beta8}"
-LUCKY_TAG="${LUCKY_TAG:-xiaojv_waf}"
-LUCKY_BASE="https://release.66666.host/v${LUCKY_VER}${LUCKY_BETA}/${LUCKY_VER}_${LUCKY_TAG}/"
+LUCKY_VER="${LUCKY_VER:-3.1.3}"
+LUCKY_BETA="${LUCKY_BETA:-beta}"
+LUCKY_TAG="${LUCKY_TAG:-lucky_docker}"
+LUCKY_BASE="https://release.66666.host/v${LUCKY_VER}${LUCKY_BETA}/${LUCKY_VER}_${LUCKY_TAG}"
 LUCKY_MK="$(find "$PACKAGE_PATH" -maxdepth 4 -type f -wholename '*/lucky/Makefile' -print -quit 2>/dev/null)"
 if [ -f "$LUCKY_MK" ]; then
 	echo " "
 
 	sed -i \
 		-e "s/^PKG_VERSION:=.*/PKG_VERSION:=$LUCKY_VER/" \
-		-e 's#https://github\.com/gdy666/lucky/releases/download/v[$](PKG_VERSION)/#'"$LUCKY_BASE"'#g' \
+		-e 's#https://github\.com/gdy666/lucky/releases/download/v[$](PKG_VERSION)/\{0,1\}#'"$LUCKY_BASE"'#g' \
 		-e 's#_Linux_[$](LUCKY_ARCH)\.tar\.gz#_Linux_$(LUCKY_ARCH)_'"$LUCKY_TAG"'.tar.gz#g' \
 		"$LUCKY_MK"
 
 	#兼容tar包内带一层目录的情况，把lucky二进制平铺到编译目录
 	awk '
-		/tar -xzvf/ && !n {
+		/(tar|HOST_TAR)/ && /PKG_BUILD_DIR/ && !n {
 			print
 			print "\t[ -f $(PKG_BUILD_DIR)/lucky ] || find $(PKG_BUILD_DIR) -type f -name lucky -exec mv -f {} $(PKG_BUILD_DIR)/lucky \\;"
 			n = 1
@@ -52,7 +52,7 @@ if [ -f "$LUCKY_MK" ]; then
 		{ print }
 	' "$LUCKY_MK" > "$LUCKY_MK.tmp" && mv -f "$LUCKY_MK.tmp" "$LUCKY_MK"
 
-	grep -nE 'PKG_VERSION:=|release\.66666\.host|xiaojv_waf' "$LUCKY_MK"
+	grep -nE 'PKG_VERSION:=|release\.66666\.host' "$LUCKY_MK"
 	echo "lucky has been fixed!"
 else
 	echo "lucky not found; skipping!"
