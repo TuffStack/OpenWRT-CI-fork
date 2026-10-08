@@ -3,28 +3,16 @@
 # Copyright (C) 2026 VIKINGYFY
 
 #移除luci-app-attendedsysupgrade
-sed -i "/attendedsysupgrade/d" $(find ./feeds/luci/collections/ -type f -name "Makefile")
+find ./feeds/luci/collections/ -type f -name "Makefile" -exec sed -i "/attendedsysupgrade/d" {} +
 #修改默认主题
-sed -i "s/luci-theme-bootstrap/luci-theme-$WRT_THEME/g" $(find ./feeds/luci/collections/ -type f -name "Makefile")
+find ./feeds/luci/collections/ -type f -name "Makefile" -exec sed -i "s/luci-theme-bootstrap/luci-theme-$WRT_THEME/g" {} +
 #修改immortalwrt.lan关联IP
-sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $(find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js")
+find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js" -exec sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" {} +
 #添加编译日期标识
-#注：feeds 每次构建都会 git checkout 还原 10_system.js，故直接注入即可（无需去重）
-STATUS_JS=$(find ./feeds/luci/modules/luci-mod-status/ -type f -name "10_system.js" | head -1)
-if [ -n "$STATUS_JS" ]; then
-	#在 (luciversion || '') 之后追加 " / 标记-日期"；用 # 作分隔符避免转义斜杠，且不使用反向引用
-	sed -i "s#(luciversion || '')#(luciversion || '') + (' / ${WRT_MARK}-${WRT_DATE}')#g" "$STATUS_JS"
-	grep -n "luciversion || ''" "$STATUS_JS"
-fi
+find ./feeds/luci/modules/luci-mod-status/ -type f -name "10_system.js" -exec sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ $WRT_MARK-$WRT_DATE')/g" {} +
 
-WIFI_SH=$(find ./target/linux/{mediatek/filogic,qualcommax}/base-files/etc/uci-defaults/ -type f -name "*set-wireless.sh" 2>/dev/null)
 WIFI_UC="./package/network/config/wifi-scripts/files/lib/wifi/mac80211.uc"
-if [ -f "$WIFI_SH" ]; then
-	#修改WIFI名称
-	sed -i "s/BASE_SSID='.*'/BASE_SSID='$WRT_SSID'/g" $WIFI_SH
-	#修改WIFI密码
-	sed -i "s/BASE_WORD='.*'/BASE_WORD='$WRT_WORD'/g" $WIFI_SH
-elif [ -f "$WIFI_UC" ]; then
+if [ -f "$WIFI_UC" ]; then
 	#修改WIFI名称
 	sed -i "s/ssid='.*'/ssid='$WRT_SSID'/g" $WIFI_UC
 	#修改WIFI密码
@@ -42,6 +30,12 @@ echo "CONFIG_PACKAGE_luci=y" >> ./.config
 echo "CONFIG_LUCI_LANG_zh_Hans=y" >> ./.config
 echo "CONFIG_PACKAGE_luci-theme-$WRT_THEME=y" >> ./.config
 echo "CONFIG_PACKAGE_luci-app-$WRT_THEME-config=y" >> ./.config
+
+#引入私有扩展配置
+if [ -f "$GITHUB_WORKSPACE/Config/PRIVATE.txt" ]; then
+	echo "Applying private configurations from PRIVATE.txt..."
+	cat $GITHUB_WORKSPACE/Config/PRIVATE.txt >> ./.config
+fi
 
 #手动调整的插件
 if [ -n "$WRT_PACKAGE" ]; then
@@ -76,4 +70,3 @@ if [[ "${WRT_TARGET^^}" == *"QUALCOMMBE"* ]]; then
 		echo "qualcommbe: ipq53xx.mk or jdcloud_re-cs-08 not found; skipping"
 	fi
 fi
-
