@@ -49,13 +49,15 @@ fi
 
 #RE-CS-08: 源码 DTS 写死 partname="factory"，本机 GPT 里实际分区名是 "0:ART"
 #(lan MAC @0x0, wan MAC @0x6，1MiB，与 DTS 的 fixed-layout 偏移完全吻合)
-DTS_FILE="$(find ./target/linux/qualcommbe -name 'ipq5332-re-cs-08.dts' -print -quit 2>/dev/null)"
-if [ -n "$DTS_FILE" ] && grep -q 'partname = "factory"' "$DTS_FILE"; then
+DTS_FILE="$(find ./target/linux/qualcommbe -name '*re-cs-08.dts' -print -quit 2>/dev/null)"
+if [ -z "$DTS_FILE" ]; then
+	echo "::warning::re-cs-08 DTS not found; partname patch SKIPPED (MAC may read wrong partition)"
+elif grep -q 'partname = "factory"' "$DTS_FILE"; then
 	sed -i 's/partname = "factory"/partname = "0:ART"/' "$DTS_FILE"
 	echo "re-cs-08 partname patched: $DTS_FILE"
 	grep -n 'partname' "$DTS_FILE"
 else
-	echo "re-cs-08 partname already patched or DTS not found"
+	echo "re-cs-08 partname already patched: $DTS_FILE"
 fi
 
 #RE-CS-08: 内核 FIT 压缩方式 gzip -> lzma
