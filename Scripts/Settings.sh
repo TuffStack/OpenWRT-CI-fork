@@ -60,21 +60,26 @@ else
 		echo "re-cs-08 partname already patched: $DTS_FILE"
 	fi
 
-	#RE-CS-08: 本机实装 SFP 为 ONT 光猫棒(ALCATELLUCENT 3FE46541AA)，主机侧固定 2.5G。
-	#源码 DTS 为匹配 10G SFP+ 工厂模块，把 ppe_sfp 口改为 10gbase-r + in-band-status，
-	#导致本 2.5G 棒回归失效，两处一并改回（硬件固定属性，速率写死不走 workflow）：
-	#  1) phy-mode 10gbase-r -> 2500base-x：否则 phylink 按 10000 选接口报
-	#     "selection of interface failed, speed 10000"，光口起不了链。
-	#  2) managed in-band-status -> fixed-status：本棒不做标准 AN，in-band 会触发
-	#     "autoneg setting not compatible with PCS" 且 PCS 锁不上(pcs-link=0)。运行时
-	#     ethtool -s autoneg off 会被 phylink 按 inband 覆盖，故必须改 DTS 重编。
-	if grep -qE 'phy-mode = "10gbase-r"|managed = "in-band-status"' "$DTS_FILE"; then
-		sed -i -e 's/phy-mode = "10gbase-r"/phy-mode = "2500base-x"/' \
-			-e 's/managed = "in-band-status"/managed = "fixed-status"/' "$DTS_FILE"
-		echo "re-cs-08 sfp patched: phy-mode -> 2500base-x, managed -> fixed-status"
-		grep -nE 'phy-mode|managed' "$DTS_FILE"
+	#RE-CS-08: SFP 口(ppe_sfp)改为 fixed-link 2500base-x
+	if grep -q 'ppe_sfp: port@2' "$DTS_FILE"; then
+		if sed -n '/ppe_sfp: port@2 {/,/};/p' "$DTS_FILE" | grep -q 'fixed-link'; then
+			echo "re-cs-08 sfp: fixed-link already present; skipping"
+		else
+			sed -i '/ppe_sfp: port@2 {/,/};/{
+				/managed = "in-band-status"/d
+				/qcom,sfp-force-sgmii/d
+				/sfp = <&sfp0>/d
+				s/phy-mode = ".*";/phy-mode = "2500base-x"; fixed-link { speed = <2500>; full-duplex; };/
+			}' "$DTS_FILE"
+			if sed -n '/ppe_sfp: port@2 {/,/};/p' "$DTS_FILE" | grep -q 'fixed-link'; then
+				echo "re-cs-08 sfp: patched to fixed-link 2500base-x"
+			else
+				echo "::warning::re-cs-08 sfp fixed-link insert FAILED (DTS layout changed); check phy-mode/indent!"
+			fi
+			sed -n '/ppe_sfp: port@2 {/,/};/p' "$DTS_FILE"
+		fi
 	else
-		echo "re-cs-08 sfp phy-mode already patched or 10gbase-r not found: $DTS_FILE"
+		echo "::warning::re-cs-08 ppe_sfp node not found; sfp patch SKIPPED"
 	fi
 fi
 
