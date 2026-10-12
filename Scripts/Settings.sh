@@ -65,18 +65,48 @@ else
 		if sed -n '/ppe_sfp: port@2 {/,/};/p' "$DTS_FILE" | grep -q 'fixed-link'; then
 			echo "re-cs-08 sfp: fixed-link already present; skipping"
 		else
+			#1) 节点范围内(缩进容错)：删 in-band 与 sfp 句柄，phy-mode 固定 2500base-x
 			sed -i '/ppe_sfp: port@2 {/,/};/{
-				/managed = "in-band-status"/d
-				/qcom,sfp-force-sgmii/d
-				/sfp = <&sfp0>/d
-				s/phy-mode = ".*";/phy-mode = "2500base-x"; fixed-link { speed = <2500>; full-duplex; };/
+				/^[[:space:]]*managed = "in-band-status";[[:space:]]*$/d
+				/^[[:space:]]*qcom,sfp-force-sgmii/d
+				/^[[:space:]]*sfp = <&sfp0>;[[:space:]]*$/d
+				s/phy-mode = "[^"]*"/phy-mode = "2500base-x"/
 			}' "$DTS_FILE"
-			if sed -n '/ppe_sfp: port@2 {/,/};/p' "$DTS_FILE" | grep -q 'fixed-link'; then
+
+			#2) 按花括号深度找到节点自身的收尾 };，在其前一行插入 fixed-link；
+			#   缩进由收尾行推导，不硬写 Tab 个数
+			awk '
+				BEGIN { inblk = 0; depth = 0 }
+				{
+					if (!inblk) {
+						print
+						if ($0 ~ /ppe_sfp: port@2/) { inblk = 1; depth = 1 }
+						next
+					}
+					buf = $0
+					depth += gsub(/\{/, "{", buf) - gsub(/\}/, "}", buf)
+					if (depth <= 0) {
+						match($0, /^[ \t]*/)
+						ind = substr($0, 1, RLENGTH) "\t"
+						print ind "fixed-link {"
+						print ind "\tspeed = <2500>;"
+						print ind "\tfull-duplex;"
+						print ind "};"
+						inblk = 0
+					}
+					print
+				}
+			' "$DTS_FILE" > "$DTS_FILE.tmp" && mv -f "$DTS_FILE.tmp" "$DTS_FILE"
+
+			#3) 校验：phy-mode 与 fixed-link 都必须落在节点内，否则显式报错不假装成功
+			#   (区间回显会在 fixed-link 自身 }; 处截断，故只用于校验，展示用 grep -A)
+			NODE_TXT="$(sed -n '/ppe_sfp: port@2 {/,/};/p' "$DTS_FILE")"
+			if grep -q 'fixed-link' <<<"$NODE_TXT" && grep -q 'phy-mode = "2500base-x"' <<<"$NODE_TXT"; then
 				echo "re-cs-08 sfp: patched to fixed-link 2500base-x"
 			else
-				echo "::warning::re-cs-08 sfp fixed-link insert FAILED (DTS layout changed); check phy-mode/indent!"
+				echo "::error::re-cs-08 sfp patch FAILED (DTS layout changed); 光口仍会不起链，请检查 ppe_sfp 节点排版"
 			fi
-			sed -n '/ppe_sfp: port@2 {/,/};/p' "$DTS_FILE"
+			grep -n -A28 'ppe_sfp: port@2' "$DTS_FILE"
 		fi
 	else
 		echo "::warning::re-cs-08 ppe_sfp node not found; sfp patch SKIPPED"
