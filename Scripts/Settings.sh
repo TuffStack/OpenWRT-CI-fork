@@ -52,12 +52,25 @@ fi
 DTS_FILE="$(find ./target/linux/qualcommbe -name '*re-cs-08.dts' -print -quit 2>/dev/null)"
 if [ -z "$DTS_FILE" ]; then
 	echo "::warning::re-cs-08 DTS not found; partname patch SKIPPED (MAC may read wrong partition)"
-elif grep -q 'partname = "factory"' "$DTS_FILE"; then
-	sed -i 's/partname = "factory"/partname = "0:ART"/' "$DTS_FILE"
-	echo "re-cs-08 partname patched: $DTS_FILE"
-	grep -n 'partname' "$DTS_FILE"
 else
-	echo "re-cs-08 partname already patched: $DTS_FILE"
+	if grep -q 'partname = "factory"' "$DTS_FILE"; then
+		sed -i 's/partname = "factory"/partname = "0:ART"/' "$DTS_FILE"
+		echo "re-cs-08 partname patched: $DTS_FILE"
+	else
+		echo "re-cs-08 partname already patched: $DTS_FILE"
+	fi
+
+	#RE-CS-08: 本机实装 SFP 光模块为 2.5G(2500base-x)，源码 DTS 的 ppe_sfp 口
+	#phy-mode 写死 "10gbase-r"，phylink 会按 10000 选接口导致
+	#"selection of interface failed, speed 10000"，光口无法起链。
+	#改为 "2500base-x" 与模块实际速率匹配(与 GENERAL.txt 声明的本机硬件一致)。
+	if grep -q 'phy-mode = "10gbase-r"' "$DTS_FILE"; then
+		sed -i 's/phy-mode = "10gbase-r"/phy-mode = "2500base-x"/' "$DTS_FILE"
+		echo "re-cs-08 sfp phy-mode patched: 10gbase-r -> 2500base-x"
+		grep -n 'phy-mode' "$DTS_FILE"
+	else
+		echo "re-cs-08 sfp phy-mode already patched or 10gbase-r not found: $DTS_FILE"
+	fi
 fi
 
 #RE-CS-08: 内核 FIT 压缩方式 gzip -> lzma
