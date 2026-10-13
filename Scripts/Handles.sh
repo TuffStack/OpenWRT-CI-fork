@@ -27,11 +27,6 @@ FIX "theme-argon" "$PACKAGE_PATH/luci-theme-argon" sed -i \
 	"s/primary '.*'/primary '#31a1a1'/g; s/'0.2'/'0.5'/g; s/'none'/'bing'/g; s/'600'/'normal'/g" \
 	"$PACKAGE_PATH/luci-theme-argon/luci-app-argon-config/root/etc/config/argon"
 
-#修改aurora菜单式样
-FIX "theme-aurora" "$PACKAGE_PATH/luci-app-aurora-config" find \
-	"$PACKAGE_PATH/luci-app-aurora-config/root/usr/share/aurora/" -type f -name '*.template' -exec sed -i \
-	"s/nav_type '.*'/nav_type 'dropdown'/g; s/struct_radius_base '.*'/struct_radius_base '0.125rem'/g" {} +
-
 LUCKY_VER="${LUCKY_VER:-3.1.3}"
 LUCKY_BETA="${LUCKY_BETA:-beta}"
 LUCKY_TAG="${LUCKY_TAG:-lucky_docker}"
