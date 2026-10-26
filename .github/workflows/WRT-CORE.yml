@@ -190,12 +190,35 @@ jobs:
         run: |
           cd ./wrt/
 
-          ./scripts/feeds update -a
-
-          # feeds 被 git clean 排除、且 feeds update 不会硬重置，需手动还原上次构建打的补丁
+          # feeds/ 被 git clean 排除，上次构建打的补丁和意外产生的本地提交会一直残留；
+          # 而 feeds update 内部执行的是 git pull --ff-only，历史一旦偏离就直接中止，
+          # 整个 update 返回 1 把构建干掉（光 checkout -- . 只能还原工作区，修不了偏离）。
+          # 这里先把每个 feed 对齐远端分支（同 Sync Code / Packages.sh 的 fetch+reset+clean 套路），
+          # 对齐不上的删掉，交给下面的 feeds update 按 feeds.conf 重新克隆
           for FEED in ./feeds/*/; do
-            [ -d "$FEED/.git" ] && git -C "$FEED" checkout -- . || true
+            NAME=$(basename "$FEED")
+            # src-link / src-cpy 类 feed 由 feeds update 自己重建，别去动它的源
+            [ -L "${FEED%/}" ] && continue
+            [ -d "$FEED/.git" ] || continue
+
+            BRANCH=$(git -C "$FEED" rev-parse --abbrev-ref HEAD)
+            # 钉在 commit 上的 feed（detached HEAD）feeds update 本来就不 pull，跳过
+            if [ "$BRANCH" = "HEAD" ]; then
+              echo "feed $NAME detached, leave it to feeds update"
+              continue
+            fi
+
+            if git -C "$FEED" fetch origin "$BRANCH" &&
+               git -C "$FEED" reset --hard FETCH_HEAD &&
+               git -C "$FEED" clean -fdx; then
+              echo "feed $NAME aligned to origin/$BRANCH"
+            else
+              echo "::warning::feed $NAME 无法对齐 origin/$BRANCH，删除后重新克隆"
+              rm -rf "$FEED"
+            fi
           done
+
+          ./scripts/feeds update -a
 
           ./scripts/feeds install -a
 
