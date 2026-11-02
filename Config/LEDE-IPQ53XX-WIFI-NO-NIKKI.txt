@@ -1,0 +1,11 @@
+#源码：coolsnowwolf/lede master（大雕）
+#设备：京东云 ER2 / 太乙Plus = jdcloud_re-cs-08（LEDE 里 DEVICE_MODEL := ER2）
+#设备平台
+CONFIG_TARGET_qualcommbe=y
+CONFIG_TARGET_qualcommbe_ipq53xx=y
+#设备列表
+CONFIG_TARGET_DEVICE_qualcommbe_ipq53xx_DEVICE_jdcloud_re-cs-08=y
+#科学插件：本机默认携带 nikki(mihomo)
+CONFIG_PACKAGE_nikki=y
+CONFIG_PACKAGE_luci-app-nikki=y
+CONFIG_PACKAGE_mihomo-alpha=y

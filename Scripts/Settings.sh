@@ -6,6 +6,10 @@
 find ./feeds/luci/collections/ -type f -name "Makefile" -exec sed -i "/attendedsysupgrade/d" {} +
 #修改默认主题
 find ./feeds/luci/collections/ -type f -name "Makefile" -exec sed -i "s/luci-theme-bootstrap/luci-theme-$WRT_THEME/g" {} +
+#大雕(LEDE)的 luci 集合里默认主题可能写的是 argon，同样换成 WRT_THEME，否则固件里会多出一套主题
+if [[ "$WRT_SOURCE" == "coolsnowwolf/lede" ]]; then
+	find ./feeds/luci/collections/ -type f -name "Makefile" -exec sed -i "s/luci-theme-argon/luci-theme-$WRT_THEME/g" {} +
+fi
 #修改immortalwrt.lan关联IP
 find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js" -exec sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" {} +
 #添加编译日期标识

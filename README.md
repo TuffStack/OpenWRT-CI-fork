@@ -24,6 +24,10 @@ https://github.com/immortalwrt/immortalwrt.git
 
 https://github.com/VIKINGYFY/immortalwrt.git
 
+大雕版（每次编译同样出一份）：
+
+https://github.com/coolsnowwolf/lede.git
+
 # U-BOOT
 
 高通版-沉心：
@@ -48,9 +52,17 @@ https://drive.wrt.moe/uboot/mediatek
 
 固件信息里的时间为编译开始的时间，方便核对上游源码提交时间。
 
-当前仅编译 IPQ53XX(qualcommbe / JDCloud RE-CS-08) 系列，输出两个固件：
+当前仅编译 IPQ53XX(qualcommbe / JDCloud RE-CS-08，即京东云太乙Plus ER2) 系列，两套源码共输出四个固件：
 - IPQ53XX-WIFI-NO-homeproxy：默认携带 homeproxy
 - IPQ53XX-WIFI-NO-NIKKI：默认携带 nikki(mihomo)
+- LEDE-IPQ53XX-WIFI-NO-homeproxy：大雕源码(coolsnowwolf/lede master) + homeproxy
+- LEDE-IPQ53XX-WIFI-NO-NIKKI：大雕源码(coolsnowwolf/lede master) + nikki(mihomo)
+
+两套源码走同一条 WRT-CORE 流水线，共用同一台自托管 runner，四个构建按队列逐个跑，
+所以一轮完整编译的耗时约为原来的两倍。
+
+ER2 的硬件修补（MAC 分区名 factory→0:ART、SFP 改 fixed-link 2500base-x、内核 FIT 改 lzma）
+对两套源码同样生效；大雕源码的 re-cs-08 是 KERNEL_SIZE 7168k，比自用版更宽松。
 
 全系默认带 Docker 与 MosDNS。
 # 目录简要说明

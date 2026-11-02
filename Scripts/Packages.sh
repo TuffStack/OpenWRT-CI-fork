@@ -49,7 +49,7 @@ UPDATE_PACKAGE() {
 	for NAME in "${PKG_LIST[@]}"; do
 		# 查找匹配的目录
 		echo "Search directory: $NAME"
-		local FOUND_DIRS=$(find ./feeds/luci/ ./feeds/packages/ -maxdepth 3 -type d -iname "*$NAME*" 2>/dev/null)
+		local FOUND_DIRS=$(find ./feeds -maxdepth 4 -type d -iname "*$NAME*" 2>/dev/null)
 
 		# 删除找到的目录
 		if [ -n "$FOUND_DIRS" ]; then
@@ -83,7 +83,9 @@ UPDATE_PACKAGE() {
 UPDATE_PACKAGE "footstrap" "VizzleTF/luci-theme-footstrap" "main"
 UPDATE_PACKAGE "vantage" "anothaDev/luci-theme-vantage" "main"
 
-UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main"
+#mihomo 一并删除：大雕源自带 net/mihomo，与这里的 mihomo-alpha 都装 /usr/bin/mihomo，
+#两个都进 rootfs 会直接文件冲突；mihomo-alpha 有 PROVIDES:=mihomo，依赖照样能满足
+UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main" "" "nikki mihomo"
 UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
 
 UPDATE_PACKAGE "easytier" "EasyTier/luci-app-easytier" "main"
