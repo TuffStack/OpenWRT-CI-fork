@@ -65,6 +65,17 @@ ER2 的硬件修补（MAC 分区名 factory→0:ART、SFP 改 fixed-link 2500bas
 对两套源码同样生效；大雕源码的 re-cs-08 是 KERNEL_SIZE 7168k，比自用版更宽松。
 
 全系默认带 Docker 与 MosDNS。
+
+## 单独跑某个编译
+
+定时自动编译固定跑全部 4 个固件（每个 workflow 内部的两个配置也全跑）。
+
+手动编译时每个固件都能单独跑：
+
+- Actions → Run workflow，先选流水线（QCB-IPQ53XX-WIFI-NO 或 LEDE-IPQ53XX-WIFI-NO），
+  再把 CONFIG 下拉框选成具体配置；默认值 ALL 表示该流水线的两个配置都跑。
+- 只想出大雕固件就只跑 LEDE 那条，反之亦然。
+- TEST（仅输出配置文件）与 WRT_CLEAN（彻底重编）对单选的配置同样生效。
 # 目录简要说明
 
 workflows——自定义CI配置

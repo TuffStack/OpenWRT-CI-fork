@@ -14,6 +14,15 @@ on:
   #手动编译
   workflow_dispatch:
     inputs:
+      CONFIG:
+        description: '选择要编译的配置，ALL 表示全部（自动触发时固定为全部）。'
+        required: false
+        type: choice
+        default: ALL
+        options:
+          - ALL
+          - LEDE-IPQ53XX-WIFI-NO-homeproxy
+          - LEDE-IPQ53XX-WIFI-NO-NIKKI
       PACKAGE:
         description: '手动调整插件包，多个请用\n符号隔开。'
         required: false
@@ -38,9 +47,11 @@ jobs:
     strategy:
       fail-fast: false
       # 大雕源码(LEDE)与官方源码共用同一台自托管 runner，
-      # WRT-CORE 里的 concurrency 分组会让 4 个构建自动排队，无需限制并行
+      # WRT-CORE 里的 concurrency 分组会让多个构建自动排队，无需限制并行
       matrix:
-        CONFIG: [LEDE-IPQ53XX-WIFI-NO-homeproxy, LEDE-IPQ53XX-WIFI-NO-NIKKI]
+        # 自动触发 / 选 ALL → 两个配置全跑；选具体配置 → 只跑那一个。
+        # 这里的列表和上面 CONFIG 选项要保持一致
+        CONFIG: ${{ (github.event_name != 'workflow_dispatch' || github.event.inputs.CONFIG == '' || github.event.inputs.CONFIG == 'ALL') && fromJSON('["LEDE-IPQ53XX-WIFI-NO-homeproxy", "LEDE-IPQ53XX-WIFI-NO-NIKKI"]') || fromJSON(format('["{0}"]', github.event.inputs.CONFIG)) }}
         SOURCE: [coolsnowwolf/lede]
         BRANCH: [master]
 
