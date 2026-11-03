@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       # 大雕源码(LEDE)与官方源码共用同一台自托管 runner，
-      # WRT-CORE 里的 concurrency 分组会让多个构建自动排队，无需限制并行
+      max-parallel: 1
       matrix:
         # 自动触发 / 选 ALL → 两个配置全跑；选具体配置 → 只跑那一个。
         # 这里的列表和上面 CONFIG 选项要保持一致

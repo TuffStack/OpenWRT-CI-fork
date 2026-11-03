@@ -79,9 +79,6 @@ jobs:
   core:
     name: ${{inputs.WRT_SOURCE}}
     runs-on: self-hosted
-    concurrency:
-      group: wrt-selfhosted      # 全局唯一，所有构建排队执行
-      cancel-in-progress: false
     steps:
       - name: Checkout Projects
         uses: actions/checkout@main
