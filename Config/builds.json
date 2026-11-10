@@ -4,16 +4,10 @@
     "LEDE": { "repo": "coolsnowwolf/lede", "branch": "master" }
   },
   "feeds": {
-    "footstrap": { "name": "footstrap", "repo": "VizzleTF/luci-theme-footstrap", "branch": "main" },
     "vantage": { "name": "vantage", "repo": "anothaDev/luci-theme-vantage", "branch": "main" },
-    "nikki": { "name": "nikki", "repo": "nikkinikki-org/OpenWrt-nikki", "branch": "main", "prune": ["nikki", "mihomo"] },
-    "openclash": { "name": "openclash", "repo": "vernesong/OpenClash", "branch": "dev", "special": "pkg" },
-    "easytier": { "name": "easytier", "repo": "EasyTier/luci-app-easytier", "branch": "main" },
     "lucky": { "name": "lucky", "repo": "gdy666/luci-app-lucky", "branch": "main" },
-    "mosdns": { "name": "mosdns", "repo": "sbwml/luci-app-mosdns", "branch": "v5", "prune": ["v2dat"] },
-    "netwizard": { "name": "netwizard", "repo": "sirpdboy/luci-app-netwizard", "branch": "main" },
     "partexp": { "name": "partexp", "repo": "sirpdboy/luci-app-partexp", "branch": "main" },
-    "timecontrol": { "name": "timecontrol", "repo": "sirpdboy/luci-app-timecontrol", "branch": "main" },
+    "nikki": { "name": "nikki", "repo": "nikkinikki-org/OpenWrt-nikki", "branch": "main", "prune": ["nikki", "mihomo"] },
     "viking": {
       "name": "viking",
       "repo": "VIKINGYFY/packages",
@@ -23,7 +17,7 @@
     "helloworld": { "name": "helloworld", "repo": "fw876/helloworld", "branch": "dev" },
     "dpd-fw": { "name": "dpd-fw", "repo": "kwrum1/dpd-fw", "branch": "main", "mode": "dpd-index" }
   },
-  "commonFeeds": ["footstrap", "vantage", "nikki", "openclash", "easytier", "lucky", "mosdns", "netwizard", "partexp", "timecontrol", "viking"],
+  "commonFeeds": ["vantage", "lucky", "partexp", "viking"],
   "profiles": {
     "homeproxy": {
       "packages": ["luci-app-homeproxy"],
@@ -31,7 +25,7 @@
     },
     "nikki": {
       "packages": ["nikki", "luci-app-nikki", "mihomo-alpha"],
-      "feeds": []
+      "feeds": ["nikki"]
     },
     "helloworld": {
       "packages": ["luci-app-ssr-plus"],

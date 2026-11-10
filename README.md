@@ -100,12 +100,23 @@ Config——自定义配置
 
 - `sources`：上游仓库与分支
 - `feeds`：所有可用包源（名称、仓库、分支、特殊模式、需清理的同名包）
-- `commonFeeds`：每个固件都要准备的基础包源
-- `profiles`：插件组合 —— 该组合额外安装的包 `packages` 与额外需要的包源 `feeds`
+- `commonFeeds`：每个固件都要准备的基础包源（白名单包所需、以及需要清理冲突包的源）
+- `profiles`：插件组合 —— 该组合额外安装的包 `packages` 与仅该组合需要的包源 `feeds`
 - `builds`：固件列表 —— 产物名 + 上游 + 插件组合
 
 `IPQ53XX-Build.yml` 的 `plan` 作业用 `python3` 读取清单，按手动输入过滤并生成构建矩阵，
 再把展开后的包清单与包源交给 `WRT-CORE.yml`；两个脚本只消费数据，不含任何硬编码。
+
+代理类源（如 `nikki`）只挂在需要它的 profile 下，避免把 `mihomo-alpha` / `mihomo-meta`
+这类上游 Kconfig 循环带进其它固件。
+
+### feed 禁用
+
+`Config/BASE.txt` 里的 `CONFIG_FEED_xxx=n` 同时是"禁用哪些 feed"的唯一真源：
+`.github/scripts/prepare-feeds.sh` 会读这三行，在 `feeds.conf` / `feeds.conf.default` 中
+取消注册，并清掉 `feeds/<name>` 与 `package/feeds/<name>` 的残留（`Sync Code` 的
+`git clean -e feeds` 会保留旧 clone）。仅设 `CONFIG_FEED_*=n` 挡不住
+`./scripts/feeds update -a` 克隆并扫描整个 feed，Qt5/Qt6 的 Kconfig 噪声就来自这里。
 
 **新增一个插件固件**（无需改脚本）：
 

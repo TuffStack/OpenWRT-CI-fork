@@ -183,6 +183,9 @@ jobs:
         run: |
           cd ./wrt/
 
+          # 按 BASE.txt 的 CONFIG_FEED_*=n 摘掉不需要的 feed（含残留清理）
+          $GITHUB_WORKSPACE/.github/scripts/prepare-feeds.sh
+
           # feeds/ 被 git clean 排除，上次构建打的补丁和意外产生的本地提交会一直残留；
           # 而 feeds update 内部执行的是 git pull --ff-only，历史一旦偏离就直接中止，
           # 整个 update 返回 1 把构建干掉（光 checkout -- . 只能还原工作区，修不了偏离）。

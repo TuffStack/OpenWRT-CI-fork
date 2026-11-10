@@ -14,7 +14,9 @@ CONFIG_CCACHE_DIR="/mnt/wrt/ccache"
 CONFIG_DEVEL=y
 CONFIG_LUCI_LANG_zh_Hans=y
 
-# feed 开关不是 CONFIG_PACKAGE_*，白名单归一管不到，必须显式关闭
+# 禁用的 feed（白名单归一管不到非 PACKAGE 符号）。
+# prepare-feeds.sh 也读这三行，在 feeds.conf 里取消注册并清理残留目录，
+# 所以这里同时是"禁用哪些 feed"的唯一真源。
 CONFIG_FEED_video=n
 CONFIG_FEED_pon_drivers=n
 CONFIG_FEED_pon_userspace=n
