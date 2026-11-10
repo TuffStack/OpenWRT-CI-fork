@@ -1,0 +1,53 @@
+{
+  "sources": {
+    "VIKINGYFY": { "repo": "VIKINGYFY/immortalwrt", "branch": "owrt" },
+    "LEDE": { "repo": "coolsnowwolf/lede", "branch": "master" }
+  },
+  "feeds": {
+    "footstrap": { "name": "footstrap", "repo": "VizzleTF/luci-theme-footstrap", "branch": "main" },
+    "vantage": { "name": "vantage", "repo": "anothaDev/luci-theme-vantage", "branch": "main" },
+    "nikki": { "name": "nikki", "repo": "nikkinikki-org/OpenWrt-nikki", "branch": "main", "prune": ["nikki", "mihomo"] },
+    "openclash": { "name": "openclash", "repo": "vernesong/OpenClash", "branch": "dev", "special": "pkg" },
+    "easytier": { "name": "easytier", "repo": "EasyTier/luci-app-easytier", "branch": "main" },
+    "lucky": { "name": "lucky", "repo": "gdy666/luci-app-lucky", "branch": "main" },
+    "mosdns": { "name": "mosdns", "repo": "sbwml/luci-app-mosdns", "branch": "v5", "prune": ["v2dat"] },
+    "netwizard": { "name": "netwizard", "repo": "sirpdboy/luci-app-netwizard", "branch": "main" },
+    "partexp": { "name": "partexp", "repo": "sirpdboy/luci-app-partexp", "branch": "main" },
+    "timecontrol": { "name": "timecontrol", "repo": "sirpdboy/luci-app-timecontrol", "branch": "main" },
+    "viking": {
+      "name": "viking",
+      "repo": "VIKINGYFY/packages",
+      "branch": "main",
+      "prune": ["axonhub", "gecoosac", "miniupnpd", "sing-box", "luci-app-homeproxy", "luci-app-timewol", "luci-app-upnp", "luci-app-wolplus", "luci-app-wolultra"]
+    },
+    "helloworld": { "name": "helloworld", "repo": "fw876/helloworld", "branch": "dev" },
+    "dpd-fw": { "name": "dpd-fw", "repo": "kwrum1/dpd-fw", "branch": "main", "mode": "dpd-index" }
+  },
+  "commonFeeds": ["footstrap", "vantage", "nikki", "openclash", "easytier", "lucky", "mosdns", "netwizard", "partexp", "timecontrol", "viking"],
+  "profiles": {
+    "homeproxy": {
+      "packages": ["luci-app-homeproxy"],
+      "feeds": []
+    },
+    "nikki": {
+      "packages": ["nikki", "luci-app-nikki", "mihomo-alpha"],
+      "feeds": []
+    },
+    "helloworld": {
+      "packages": ["luci-app-ssr-plus"],
+      "feeds": ["helloworld"]
+    },
+    "dpd": {
+      "packages": ["luci-app-dpd", "dpd-fastpath", "dpd-napi", "dpd-acl", "dpd-qos", "dpd-mwan"],
+      "feeds": ["dpd-fw"]
+    }
+  },
+  "builds": [
+    { "name": "VIKINGYFY-IPQ53XX-HP", "source": "VIKINGYFY", "profile": "homeproxy" },
+    { "name": "VIKINGYFY-IPQ53XX-NIKKI", "source": "VIKINGYFY", "profile": "nikki" },
+    { "name": "LEDE-IPQ53XX-HP", "source": "LEDE", "profile": "homeproxy" },
+    { "name": "LEDE-IPQ53XX-NIKKI", "source": "LEDE", "profile": "nikki" },
+    { "name": "VIKINGYFY-IPQ53XX-DPD", "source": "VIKINGYFY", "profile": "dpd" },
+    { "name": "VIKINGYFY-IPQ53XX-SSR", "source": "VIKINGYFY", "profile": "helloworld" }
+  ]
+}

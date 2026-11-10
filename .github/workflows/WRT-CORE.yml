@@ -10,22 +10,16 @@ on:
       WRT_CONFIG:
         required: true
         type: string
-      WRT_THEME:
+      WRT_PROFILE:
+        description: '插件组合名，对应 Config/builds.json 的 profiles'
         required: true
         type: string
-      WRT_NAME:
+      WRT_PACKAGES:
+        description: '该固件的插件包清单（JSON 数组字符串）'
         required: true
         type: string
-      WRT_SSID:
-        required: true
-        type: string
-      WRT_WORD:
-        required: true
-        type: string
-      WRT_IP:
-        required: true
-        type: string
-      WRT_PW:
+      WRT_FEEDS:
+        description: '该固件需要的包源（JSON 数组字符串）'
         required: true
         type: string
       WRT_REPO:
@@ -36,9 +30,6 @@ on:
         type: string
       WRT_SOURCE:
         required: true
-        type: string
-      WRT_PACKAGE:
-        required: false
         type: string
       WRT_TEST:
         required: false
@@ -53,17 +44,19 @@ on:
 env:
   GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
   WRT_CONFIG: ${{inputs.WRT_CONFIG}}
-  WRT_THEME: ${{inputs.WRT_THEME}}
-  WRT_NAME: ${{inputs.WRT_NAME}}
-  WRT_SSID: ${{inputs.WRT_SSID}}
-  WRT_WORD: ${{inputs.WRT_WORD}}
-  WRT_IP: ${{inputs.WRT_IP}}
-  WRT_PW: ${{inputs.WRT_PW}}
+  WRT_PROFILE: ${{inputs.WRT_PROFILE}}
+  WRT_PACKAGES: ${{inputs.WRT_PACKAGES}}
+  WRT_FEEDS: ${{inputs.WRT_FEEDS}}
   WRT_REPO: ${{inputs.WRT_REPO}}
   WRT_BRANCH: ${{inputs.WRT_BRANCH}}
   WRT_SOURCE: ${{inputs.WRT_SOURCE}}
-  WRT_PACKAGE: ${{inputs.WRT_PACKAGE}}
   WRT_TEST: ${{inputs.WRT_TEST}}
+  WRT_THEME: vantage
+  WRT_NAME: OWRT
+  WRT_SSID: OWRT
+  WRT_WORD: '12345678'
+  WRT_IP: 192.168.1.1
+  WRT_PW: 无
   WRT_ROOT: /mnt/wrt
   CCACHE_MAXSIZE: 50G
   WRT_CLEAN: ${{inputs.WRT_CLEAN}}
@@ -77,7 +70,7 @@ env:
 
 jobs:
   core:
-    name: ${{inputs.WRT_SOURCE}}
+    name: ${{inputs.WRT_CONFIG}}
     runs-on: self-hosted
     steps:
       - name: Checkout Projects
@@ -100,11 +93,11 @@ jobs:
 
           # Debian 宿主机依赖自检：缺工具时提前告警，避免编译中后期深处失败浪费缓存
           DEPS_MISSING=""
-          for t in git ccache g++ make file python3 jq dos2unix; do
+          for t in git ccache g++ make file python3 dos2unix; do
             command -v "$t" > /dev/null || DEPS_MISSING="$DEPS_MISSING $t"
           done
           if [ -n "$DEPS_MISSING" ]; then
-            echo "::warning::缺少编译依赖:$DEPS_MISSING (Debian: sudo apt install -y git ccache build-essential file python3 jq dos2unix)"
+            echo "::warning::缺少编译依赖:$DEPS_MISSING (Debian: sudo apt install -y git ccache build-essential file python3 dos2unix)"
           fi
 
           # 基础工具自检：sed 挂掉会导致 prepare-tmpinfo 必失败
@@ -120,13 +113,15 @@ jobs:
       - name: Initialization Values
         id: initialize-values
         run: |
-          WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[^=_]+(?=\=y)' "./Config/$WRT_CONFIG.txt")
-          WRT_SUBTARGET=$(grep -m 1 -oP "^CONFIG_TARGET_${WRT_TARGET}_\K[^=_]+(?=\=y)" "./Config/$WRT_CONFIG.txt")
+          BASE_CFG="$GITHUB_WORKSPACE/Config/BASE.txt"
+          [ -f "$BASE_CFG" ] || { echo "::error::缺少 $BASE_CFG"; exit 1; }
+          WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[^=_]+(?=\=y)' "$BASE_CFG")
+          WRT_SUBTARGET=$(grep -m 1 -oP "^CONFIG_TARGET_${WRT_TARGET}_\K[^=_]+(?=\=y)" "$BASE_CFG")
+          [ -n "$WRT_TARGET" ] && [ -n "$WRT_SUBTARGET" ] || { echo "::error::无法从 BASE.txt 解析目标平台"; exit 1; }
           WRT_CACHE_SOURCE=${WRT_SOURCE//\//-}
           WRT_CACHE_BRANCH=${WRT_BRANCH//\//-}
           WRT_CACHE_TARGET="$WRT_TARGET-$WRT_SUBTARGET"
           WRT_CACHE_PREFIX="wrt-$WRT_CACHE_SOURCE-$WRT_CACHE_BRANCH-$WRT_CACHE_TARGET"
-          WRT_WIFI=$(grep -oE 'WIFI-(YES|NO)$' <<< "${WRT_CONFIG^^}" || true); WRT_WIFI=${WRT_WIFI:-none}
 
           {
             echo "WRT_INFO=${WRT_SOURCE%%/*}"
@@ -181,7 +176,8 @@ jobs:
 
       - name: Check Scripts
         run: |
-          find ./ -maxdepth 3 -type f -iregex ".*\(txt\|sh\)$" -exec dos2unix {} \; -exec chmod +x {} \;
+          find ./ -maxdepth 3 -type f \( -iname "*.txt" -o -iname "*.conf" \) -exec dos2unix {} \;
+          find ./ -maxdepth 3 -type f -iname "*.sh" -exec dos2unix {} \; -exec chmod +x {} \;
 
       - name: Update Feeds
         run: |
@@ -231,17 +227,11 @@ jobs:
         run: |
           cd ./wrt/
 
-          if [[ "${WRT_CONFIG,,}" == *"test"* ]]; then
-            cat $GITHUB_WORKSPACE/Config/$WRT_CONFIG.txt >> .config
-          else
-            cat $GITHUB_WORKSPACE/Config/$WRT_CONFIG.txt $GITHUB_WORKSPACE/Config/GENERAL.txt >> .config
-          fi
-
+          $GITHUB_WORKSPACE/Scripts/Configure.sh "$WRT_PROFILE"
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/Scripts/Kernel.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
 
-          make defconfig -j$(nproc)
           if [[ "${WRT_CLEAN:-false}" == "true" ]]; then
             make clean -j$(nproc)
           fi
@@ -291,7 +281,7 @@ jobs:
           $GITHUB_WORKSPACE/.github/scripts/collect-build-reports.sh
 
       - name: Upload Build Reports
-        if: ${{ !inputs.WRT_TEST && always() }}
+        if: ${{ always() }}
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
@@ -341,7 +331,7 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@master
         with: &REL_INPUTS
-          tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_DATE}}
+          tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
           files: ./wrt/upload/*.*
           overwrite_files: true
           body: |
@@ -356,6 +346,7 @@ jobs:
             提交：${{env.WRT_HASH}}
 
             配置：${{env.WRT_CONFIG}}
+            插件组合：${{env.WRT_PROFILE}}
             平台：${{env.WRT_TARGET}}
 
             登录地址：${{env.WRT_IP}}

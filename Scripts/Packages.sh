@@ -1,6 +1,12 @@
 #!/bin/bash
 # SPDX-License-Identifier: MIT
 # Copyright (C) 2026 VIKINGYFY
+#
+# Scripts/Packages.sh —— 按需准备包源
+# 执行目录：wrt/
+#
+# 包源来自 WRT_FEEDS（JSON 数组，来自 Config/builds.json，由 plan 作业展开）。
+# 是否安装由 Config/ENABLE.conf + WRT_PACKAGES 决定，这里只保证"包存在"。
 
 PKG_CACHE="${WRT_PKG_CACHE:-/mnt/wrt/pkgcache}"
 PKG_SRC_DIR=""   # 由 clone_or_update 写入，避免用 $(...) 捕获从而混入诊断输出
@@ -47,11 +53,9 @@ UPDATE_PACKAGE() {
 
 	# 删除本地可能存在的不同名称的软件包
 	for NAME in "${PKG_LIST[@]}"; do
-		# 查找匹配的目录
 		echo "Search directory: $NAME"
 		local FOUND_DIRS=$(find ./feeds -maxdepth 4 -type d -iname "*$NAME*" 2>/dev/null)
 
-		# 删除找到的目录
 		if [ -n "$FOUND_DIRS" ]; then
 			while read -r DIR; do
 				rm -rf "$DIR"
@@ -75,72 +79,73 @@ UPDATE_PACKAGE() {
 	fi
 }
 
-# 调用示例
-# UPDATE_PACKAGE "OpenAppFilter" "destan19/OpenAppFilter" "master" "" "custom_name1 custom_name2"
-# UPDATE_PACKAGE "open-app-filter" "destan19/OpenAppFilter" "master" "" "luci-app-appfilter oaf" 这样会把原有的open-app-filter，luci-app-appfilter，oaf相关组件删除，不会出现coremark错误。
+# dpd-fw 根目录按层组织（bpf/ plugins/ userspace/ openwrt/），不是 flat feed，
+# 直接 clone 到 package/ 或 src-git 都扫不到包。按官方 openwrt/feed/README.md 的
+# Option B，把每个含 Makefile 的源目录以 PKG_NAME 链接进 package/dpd-fw/。
+setup_dpd_feed() {
+	local REPO="$1" BRANCH="$2"
+	clone_or_update "$REPO" "$BRANCH"
+	local SRC="$PKG_SRC_DIR"
+	local DEST="./package/dpd-fw"
+	local -A DPD_MAP=(
+		[dpd-fastpath]="bpf/core"
+		[dpd-napi]="userspace/dpd-napi"
+		[router-acl]="plugins/dpd-acl"
+		[einat-ebpf]="plugins/dpd-einat"
+		[dpd-einat-sync]="plugins/dpd-einat-sync"
+		[dpd-honk]="plugins/dpd-honk"
+		[dpd-observe]="plugins/dpd-observe"
+		[router-qos]="plugins/dpd-qos"
+		[router-tuning]="plugins/dpd-tuning"
+		[dpd-acl]="openwrt/meta/dpd-acl"
+		[dpd-mwan]="openwrt/meta/dpd-mwan"
+		[dpd-qos]="openwrt/meta/dpd-qos"
+		[luci-app-dpd]="openwrt/luci-app-dpd"
+	)
 
-# UPDATE_PACKAGE "包名" "项目地址" "项目分支" "pkg/name，可选，pkg为从大杂烩中单独提取包名插件；name为重命名为包名"
-UPDATE_PACKAGE "footstrap" "VizzleTF/luci-theme-footstrap" "main"
-UPDATE_PACKAGE "vantage" "anothaDev/luci-theme-vantage" "main"
-
-#mihomo 一并删除：大雕源自带 net/mihomo，与这里的 mihomo-alpha 都装 /usr/bin/mihomo，
-#两个都进 rootfs 会直接文件冲突；mihomo-alpha 有 PROVIDES:=mihomo，依赖照样能满足
-UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main" "" "nikki mihomo"
-UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
-
-UPDATE_PACKAGE "easytier" "EasyTier/luci-app-easytier" "main"
-UPDATE_PACKAGE "lucky" "gdy666/luci-app-lucky" "main"
-UPDATE_PACKAGE "mosdns" "sbwml/luci-app-mosdns" "v5" "" "v2dat"
-UPDATE_PACKAGE "netwizard" "sirpdboy/luci-app-netwizard" "main"
-UPDATE_PACKAGE "partexp" "sirpdboy/luci-app-partexp" "main"
-UPDATE_PACKAGE "timecontrol" "sirpdboy/luci-app-timecontrol" "main"
-UPDATE_PACKAGE "viking" "VIKINGYFY/packages" "main" "" "axonhub gecoosac miniupnpd sing-box luci-app-homeproxy luci-app-timewol luci-app-upnp luci-app-wolplus luci-app-wolultra"
-
-#更新软件包版本
-UPDATE_VERSION() {
-	local PKG_NAME=$1
-	local PKG_MARK=${2:-false}
-	local PKG_FILES=$(find ./package/ ./feeds/packages/ -maxdepth 3 -type f -wholename "*/$PKG_NAME/Makefile")
-
-	if [ -z "$PKG_FILES" ]; then
-		echo "$PKG_NAME not found!"
-		return
-	fi
-
-	echo -e "\n$PKG_NAME version update has started!"
-
-	for PKG_FILE in $PKG_FILES; do
-		local PKG_REPO=$(grep -Po "PKG_SOURCE_URL:=https://.*github.com/\K[^/]+/[^/]+(?=.*)" $PKG_FILE)
-		local PKG_TAG=$(curl -sL "https://api.github.com/repos/$PKG_REPO/releases" | jq -r "map(select(.prerelease == $PKG_MARK)) | first | .tag_name")
-
-		local OLD_VER=$(grep -Po "PKG_VERSION:=\K.*" "$PKG_FILE")
-		local OLD_URL=$(grep -Po "PKG_SOURCE_URL:=\K.*" "$PKG_FILE")
-		local OLD_FILE=$(grep -Po "PKG_SOURCE:=\K.*" "$PKG_FILE")
-		local OLD_HASH=$(grep -Po "PKG_HASH:=\K.*" "$PKG_FILE")
-
-		local PKG_URL=$([[ "$OLD_URL" == *"releases"* ]] && echo "${OLD_URL%/}/$OLD_FILE" || echo "${OLD_URL%/}")
-
-		local NEW_VER=$(echo $PKG_TAG | sed -E 's/[^0-9]+/\./g; s/^\.|\.$//g')
-		local NEW_URL=$(echo $PKG_URL | sed "s/\$(PKG_VERSION)/$NEW_VER/g; s/\$(PKG_NAME)/$PKG_NAME/g")
-		local NEW_HASH=$(curl -sL "$NEW_URL" | sha256sum | cut -d ' ' -f 1)
-
-		echo "old version: $OLD_VER $OLD_HASH"
-		echo "new version: $NEW_VER $NEW_HASH"
-
-		if [[ "$NEW_VER" =~ ^[0-9].* ]] && dpkg --compare-versions "$OLD_VER" lt "$NEW_VER"; then
-			sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$NEW_VER/g" "$PKG_FILE"
-			sed -i "s/PKG_HASH:=.*/PKG_HASH:=$NEW_HASH/g" "$PKG_FILE"
-			echo "$PKG_FILE version has been updated!"
-		else
-			echo "$PKG_FILE version is already the latest!"
+	rm -rf "$DEST"
+	mkdir -p "$DEST"
+	local NAME COUNT=0
+	for NAME in "${!DPD_MAP[@]}"; do
+		if [ -f "$SRC/${DPD_MAP[$NAME]}/Makefile" ]; then
+			ln -sfn "$SRC/${DPD_MAP[$NAME]}" "$DEST/$NAME"
+			COUNT=$((COUNT + 1))
 		fi
 	done
+	echo "dpd-fw: linked $COUNT packages into $DEST"
+	[ "$COUNT" -gt 0 ] || { echo "::error::dpd-fw 包目录结构变化，未找到任何 Makefile"; exit 1; }
 }
 
-#UPDATE_VERSION "软件包名" "测试版，true，可选，默认为否"
-#UPDATE_VERSION "sing-box"
-
-#引入私有扩展脚本
-if [ -f "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh" ]; then
-	source "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh"
+# 正常由 plan 作业注入；本地单独调试时回退到清单按 profile 取值
+if [ -z "${WRT_FEEDS:-}" ]; then
+	BUILDS="${GITHUB_WORKSPACE:-$PWD}/Config/builds.json"
+	[ -f "$BUILDS" ] || { echo "::error::缺少 WRT_FEEDS，且找不到 $BUILDS"; exit 1; }
+	WRT_FEEDS=$(python3 -c '
+import json, sys
+cfg = json.load(open(sys.argv[1], encoding="utf-8"))
+p = cfg["profiles"][sys.argv[2]]
+keys = sorted(set(cfg["commonFeeds"]) | set(p.get("feeds", [])))
+print(json.dumps([cfg["feeds"][k] for k in keys]))
+' "$BUILDS" "${WRT_PROFILE:-}")
 fi
+python3 -c 'import json,sys; sys.exit(0 if isinstance(json.loads(sys.argv[1]),list) else 1)' "$WRT_FEEDS" \
+	|| { echo "::error::WRT_FEEDS 不是 JSON 数组: $WRT_FEEDS"; exit 1; }
+
+# 展开成 TSV，避免为每个字段起一个解析进程
+while IFS=$'\t' read -r F_NAME F_REPO F_BRANCH F_SPECIAL F_PRUNE F_MODE; do
+	[ -n "$F_NAME" ] || continue
+	case "$F_MODE" in
+		package)   UPDATE_PACKAGE "$F_NAME" "$F_REPO" "$F_BRANCH" "$F_SPECIAL" "$F_PRUNE" ;;
+		dpd-index) setup_dpd_feed "$F_REPO" "$F_BRANCH" ;;
+		*)         echo "::warning::未知包源模式 $F_MODE（$F_NAME），跳过" ;;
+	esac
+done < <(python3 -c '
+import json, sys
+for f in json.loads(sys.argv[1]):
+    print("\t".join([
+        f["name"], f["repo"], f["branch"],
+        f.get("special", ""),
+        " ".join(f.get("prune", [])),
+        f.get("mode", "package"),
+    ]))
+' "$WRT_FEEDS")

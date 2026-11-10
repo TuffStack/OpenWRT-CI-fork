@@ -22,11 +22,6 @@ FIX() {
 	fi
 }
 
-#修改argon主题字体和颜色
-FIX "theme-argon" "$PACKAGE_PATH/luci-theme-argon" sed -i \
-	"s/primary '.*'/primary '#31a1a1'/g; s/'0.2'/'0.5'/g; s/'none'/'bing'/g; s/'600'/'normal'/g" \
-	"$PACKAGE_PATH/luci-theme-argon/luci-app-argon-config/root/etc/config/argon"
-
 #修改vantage进度条标签字体（anothaDev/luci-theme-vantage#52）
 FIX "theme-vantage" "$PACKAGE_PATH/luci-theme-vantage" sed -i \
 	-e '/^\/\* progress bars: thin track/,$ { /^\.cbi-progressbar::before {/,/^}/ { s/^[[:space:]]*font: 500 var(--fs-micro)\/1\.2 var(--mono);/\tfont: inherit; line-height: normal;/; } }' \

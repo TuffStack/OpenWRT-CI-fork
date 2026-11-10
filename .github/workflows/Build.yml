@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: MIT
+# Copyright (C) 2026 VIKINGYFY
+
+# 唯一的固件编译入口：从 Config/builds.json 动态生成构建矩阵
+name: IPQ53XX-Build
+
+on:
+  #自动编译：当 Auto-Clean 运行完成后
+  workflow_run:
+    workflows: ["Auto-Clean"]
+    types:
+      - completed
+  #手动编译
+  workflow_dispatch:
+    inputs:
+      SOURCE:
+        description: '上游源码；ALL 表示全部。可选值见 Config/builds.json 的 sources'
+        required: false
+        type: choice
+        default: ALL
+        options:
+          - ALL
+          - VIKINGYFY
+          - LEDE
+      PROFILE:
+        description: '插件组合；ALL 表示全部。可选值见 Config/builds.json 的 profiles'
+        required: false
+        type: choice
+        default: ALL
+        options:
+          - ALL
+          - homeproxy
+          - nikki
+          - helloworld
+          - dpd
+      TEST:
+        description: '仅输出配置文件，不编译固件。'
+        default: false
+        required: false
+        type: boolean
+      WRT_CLEAN:
+        description: '编译前执行 make clean（清空 build_dir）。'
+        default: false
+        required: false
+        type: boolean
+
+permissions: write-all
+
+jobs:
+  plan:
+    name: Plan builds
+    runs-on: self-hosted
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - name: Checkout Projects
+        uses: actions/checkout@main
+
+      - name: Generate build matrix
+        id: gen
+        env:
+          REQ_SOURCE: ${{ github.event.inputs.SOURCE || 'ALL' }}
+          REQ_PROFILE: ${{ github.event.inputs.PROFILE || 'ALL' }}
+        run: |
+          set -e
+          CFG="$GITHUB_WORKSPACE/Config/builds.json"
+          OUT="$RUNNER_TEMP/build-matrix.json"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/plan-builds.py" \
+            "$CFG" "${REQ_SOURCE:-ALL}" "${REQ_PROFILE:-ALL}" > "$OUT"
+
+          echo "matrix=$(cat "$OUT")" >> "$GITHUB_OUTPUT"
+          {
+            echo "### 本次构建"
+            python3 -c 'import json,sys; [print("- " + x["name"] + " [" + x["source"] + " / " + x["profile"] + "]") for x in json.load(open(sys.argv[1],encoding="utf-8"))["include"]]' "$OUT"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: plan
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      # 共用同一台自托管 runner，全部构建串行
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    uses: ./.github/workflows/WRT-CORE.yml
+    with:
+      WRT_CONFIG: ${{ matrix.name }}
+      WRT_PROFILE: ${{ matrix.profile }}
+      WRT_PACKAGES: ${{ toJSON(matrix.packages) }}
+      WRT_FEEDS: ${{ toJSON(matrix.feeds) }}
+      WRT_REPO: https://github.com/${{ matrix.repo }}.git
+      WRT_BRANCH: ${{ matrix.branch }}
+      WRT_SOURCE: ${{ matrix.repo }}
+      WRT_TEST: ${{ github.event.inputs.TEST || false }}
+      WRT_CLEAN: ${{ github.event.inputs.WRT_CLEAN || false }}
+    secrets: inherit
