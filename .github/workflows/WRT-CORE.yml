@@ -123,15 +123,14 @@ jobs:
           WRT_CACHE_TARGET="$WRT_TARGET-$WRT_SUBTARGET"
           WRT_CACHE_PREFIX="wrt-$WRT_CACHE_SOURCE-$WRT_CACHE_BRANCH-$WRT_CACHE_TARGET"
 
+          # 产物命名只依赖 WRT_CONFIG + WRT_DATE；WRT_CONFIG 已编码上游与插件组合
           {
-            echo "WRT_INFO=${WRT_SOURCE%%/*}"
             echo "WRT_MARK=${GITHUB_REPOSITORY%%/*}"
             echo "WRT_DATE=$(TZ=UTC-8 date +"%y.%m.%d-%H.%M.%S")"
             echo "WRT_CACHE_PREFIX=$WRT_CACHE_PREFIX"
             echo "WRT_CACHE_TARGET=$WRT_CACHE_TARGET"
             echo "WRT_SUBTARGET=$WRT_SUBTARGET"
             echo "WRT_TARGET=$WRT_TARGET"
-            echo "WRT_WIFI=wifi-no"
             echo "WRT_KVER=none"
             echo "WRT_LIST=none"
           } >> "$GITHUB_ENV"
@@ -288,7 +287,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: build-reports-${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{github.run_attempt}}
+          name: build-reports-${{env.WRT_CONFIG}}-${{github.run_attempt}}
           path: ./build-reports/
           retention-days: 7
 
@@ -308,7 +307,7 @@ jobs:
         run: |
           cd ./wrt/ && mkdir -p ./upload/
 
-          cp -f ./.config ./upload/Config-"$WRT_CONFIG"-"$WRT_INFO"-"$WRT_BRANCH"-"$WRT_DATE".txt
+          cp -f ./.config ./upload/Config-"$WRT_CONFIG"-"$WRT_DATE".txt
 
           if [[ "$WRT_TEST" != 'true' ]]; then
             echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
@@ -319,7 +318,7 @@ jobs:
             for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
               EXT=$(basename $FILE | cut -d '.' -f 2-)
               NAME=$(basename $FILE | cut -d '.' -f 1 | grep -io "\($WRT_TARGET\).*")
-              NEW_FILE="$NAME"-"$WRT_INFO"-"$WRT_BRANCH"-"$WRT_WIFI"-"$WRT_DATE"."$EXT"
+              NEW_FILE="$WRT_CONFIG"-"$NAME"-"$WRT_DATE"."$EXT"
               mv -f $FILE ./upload/$NEW_FILE
             done
 
@@ -334,7 +333,7 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@master
         with: &REL_INPUTS
-          tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
+          tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_DATE}}
           files: ./wrt/upload/*.*
           overwrite_files: true
           body: |

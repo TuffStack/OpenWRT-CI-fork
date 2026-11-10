@@ -34,6 +34,12 @@ def main() -> int:
     common = cfg["commonFeeds"]
 
     # 清单自检：任何悬空引用都在这里报清楚，而不是等到编译中途
+    build_names = [b["name"] for b in cfg["builds"]]
+    duplicates = sorted({n for n in build_names if build_names.count(n) > 1})
+    if duplicates:
+        return fail(
+            f"builds 中 name 重复（tag 由 name + 日期组成，重复会覆盖 Release）: {', '.join(duplicates)}"
+        )
     for build in cfg["builds"]:
         if build["source"] not in sources:
             return fail(f"{build['name']} 引用了未知 source: {build['source']}")

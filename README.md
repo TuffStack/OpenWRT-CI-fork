@@ -122,7 +122,7 @@ Config——自定义配置
 
 1. 在 `feeds` 里声明插件源（若需要）
 2. 在 `profiles` 里加一个组合，写 `packages` 与 `feeds`
-3. 在 `builds` 里加一行指定产物名、上游、组合
+3. 在 `builds` 里加一行指定产物名、上游、组合（`name` 也是 Release tag 前缀，必须唯一，`plan-builds.py` 会自检）
 4. 在 `IPQ53XX-Build.yml` 的 `PROFILE` 下拉框加一个选项（仅影响手动单选，ALL 会自动包含新组合）
 
 ## 插件控制
