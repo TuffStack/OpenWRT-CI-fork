@@ -131,21 +131,30 @@ fi
 python3 -c 'import json,sys; sys.exit(0 if isinstance(json.loads(sys.argv[1]),list) else 1)' "$WRT_FEEDS" \
 	|| { echo "::error::WRT_FEEDS 不是 JSON 数组: $WRT_FEEDS"; exit 1; }
 
-# 展开成 TSV，避免为每个字段起一个解析进程
-while IFS=$'\t' read -r F_NAME F_REPO F_BRANCH F_SPECIAL F_PRUNE F_MODE; do
-	[ -n "$F_NAME" ] || continue
-	case "$F_MODE" in
-		package)   UPDATE_PACKAGE "$F_NAME" "$F_REPO" "$F_BRANCH" "$F_SPECIAL" "$F_PRUNE" ;;
-		dpd-index) setup_dpd_feed "$F_REPO" "$F_BRANCH" ;;
-		*)         echo "::warning::未知包源模式 $F_MODE（$F_NAME），跳过" ;;
-	esac
-done < <(python3 -c '
+# 展开成 | 分隔的记录。| 不是 IFS 空白字符，连续的 || 会保留中间的空字段
+# （用 tab 会被 bash read 合并，导致 mode 字段错位、所有包源被判为未知模式）
+FEEDS_TSV="$(mktemp)"
+python3 -c '
 import json, sys
 for f in json.loads(sys.argv[1]):
-    print("\t".join([
+    fields = [
         f["name"], f["repo"], f["branch"],
         f.get("special", ""),
         " ".join(f.get("prune", [])),
         f.get("mode", "package"),
-    ]))
-' "$WRT_FEEDS")
+    ]
+    if any("|" in x for x in fields):
+        sys.exit("::error::包源字段含分隔符 |: %r" % (fields,))
+    print("|".join(fields))
+' "$WRT_FEEDS" > "$FEEDS_TSV" || { echo "::error::展开 WRT_FEEDS 失败"; exit 1; }
+[ -s "$FEEDS_TSV" ] || { echo "::error::WRT_FEEDS 展开后为空"; exit 1; }
+
+while IFS='|' read -r F_NAME F_REPO F_BRANCH F_SPECIAL F_PRUNE F_MODE; do
+	[ -n "$F_NAME" ] || continue
+	case "$F_MODE" in
+		package)   UPDATE_PACKAGE "$F_NAME" "$F_REPO" "$F_BRANCH" "$F_SPECIAL" "$F_PRUNE" ;;
+		dpd-index) setup_dpd_feed "$F_REPO" "$F_BRANCH" ;;
+		*)         echo "::error::未知包源模式 $F_MODE（$F_NAME）"; exit 1 ;;
+	esac
+done < "$FEEDS_TSV"
+rm -f "$FEEDS_TSV"
