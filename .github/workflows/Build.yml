@@ -91,6 +91,6 @@ jobs:
       WRT_REPO: https://github.com/${{ matrix.repo }}.git
       WRT_BRANCH: ${{ matrix.branch }}
       WRT_SOURCE: ${{ matrix.repo }}
-      WRT_TEST: ${{ github.event.inputs.TEST || false }}
-      WRT_CLEAN: ${{ github.event.inputs.WRT_CLEAN || false }}
+      WRT_TEST: ${{ inputs.TEST || false }}
+      WRT_CLEAN: ${{ inputs.WRT_CLEAN || false }}
     secrets: inherit
