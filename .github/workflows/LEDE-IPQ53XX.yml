@@ -2,7 +2,7 @@
 # Copyright (C) 2026 VIKINGYFY
 
 #CI项目
-name: LEDE-IPQ53XX-WIFI-NO
+name: LEDE-IPQ53XX
 
 #CI计划
 on:
@@ -21,8 +21,8 @@ on:
         default: ALL
         options:
           - ALL
-          - LEDE-IPQ53XX-WIFI-NO-homeproxy
-          - LEDE-IPQ53XX-WIFI-NO-NIKKI
+          - LEDE-IPQ53XX-HP
+          - LEDE-IPQ53XX-NIKKI
       PACKAGE:
         description: '手动调整插件包，多个请用\n符号隔开。'
         required: false
@@ -51,7 +51,7 @@ jobs:
       matrix:
         # 自动触发 / 选 ALL → 两个配置全跑；选具体配置 → 只跑那一个。
         # 这里的列表和上面 CONFIG 选项要保持一致
-        CONFIG: ${{ (github.event_name != 'workflow_dispatch' || github.event.inputs.CONFIG == '' || github.event.inputs.CONFIG == 'ALL') && fromJSON('["LEDE-IPQ53XX-WIFI-NO-homeproxy", "LEDE-IPQ53XX-WIFI-NO-NIKKI"]') || fromJSON(format('["{0}"]', github.event.inputs.CONFIG)) }}
+        CONFIG: ${{ (github.event_name != 'workflow_dispatch' || github.event.inputs.CONFIG == '' || github.event.inputs.CONFIG == 'ALL') && fromJSON('["LEDE-IPQ53XX-HP", "LEDE-IPQ53XX-NIKKI"]') || fromJSON(format('["{0}"]', github.event.inputs.CONFIG)) }}
         SOURCE: [coolsnowwolf/lede]
         BRANCH: [master]
 

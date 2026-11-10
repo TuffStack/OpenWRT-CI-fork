@@ -46,11 +46,6 @@ if [ -n "$WRT_PACKAGE" ]; then
 	echo -e "$WRT_PACKAGE" >> ./.config
 fi
 
-#无WIFI配置标志
-if [[ "${WRT_CONFIG,,}" == *"wifi"* && "${WRT_CONFIG,,}" == *"no"* ]]; then
-	echo "WRT_WIFI=wifi-no" >> $GITHUB_ENV
-fi
-
 #RE-CS-08: 源码 DTS 写死 partname="factory"，本机 GPT 里实际分区名是 "0:ART"
 #(lan MAC @0x0, wan MAC @0x6，1MiB，与 DTS 的 fixed-layout 偏移完全吻合)
 DTS_FILE="$(find ./target/linux/qualcommbe -name '*re-cs-08.dts' -print -quit 2>/dev/null)"

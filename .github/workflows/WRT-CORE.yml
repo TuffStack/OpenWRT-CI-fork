@@ -136,7 +136,7 @@ jobs:
             echo "WRT_CACHE_TARGET=$WRT_CACHE_TARGET"
             echo "WRT_SUBTARGET=$WRT_SUBTARGET"
             echo "WRT_TARGET=$WRT_TARGET"
-            echo "WRT_WIFI=$WRT_WIFI"
+            echo "WRT_WIFI=wifi-no"
             echo "WRT_KVER=none"
             echo "WRT_LIST=none"
           } >> "$GITHUB_ENV"
@@ -341,7 +341,7 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@master
         with: &REL_INPUTS
-          tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
+          tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_DATE}}
           files: ./wrt/upload/*.*
           overwrite_files: true
           body: |
