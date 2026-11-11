@@ -46,6 +46,12 @@ on:
 
 permissions: write-all
 
+# 单台 self-hosted runner：新 run 取消旧的排队/运行作业，避免多次触发叠加后
+# 后续 job 长时间卡在 "Waiting for a runner"（排队阶段不受作业超时保护）
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   plan:
     name: Plan builds
