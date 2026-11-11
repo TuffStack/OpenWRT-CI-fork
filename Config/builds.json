@@ -15,7 +15,15 @@
       "prune": ["axonhub", "gecoosac", "miniupnpd", "sing-box", "luci-app-homeproxy", "luci-app-timewol", "luci-app-upnp", "luci-app-wolplus", "luci-app-wolultra"]
     },
     "helloworld": { "name": "helloworld", "repo": "fw876/helloworld", "branch": "dev" },
-    "dpd-fw": { "name": "dpd-fw", "repo": "kwrum1/dpd-fw", "branch": "main", "mode": "dpd-index" }
+    "dpd-fw": { "name": "dpd-fw", "repo": "kwrum1/dpd-fw", "branch": "main", "mode": "dpd-index" },
+    "honk": { "name": "honk", "repo": "kenzok8/openwrt-honk", "branch": "main", "special": "pkg" },
+    "v2ray-geodata": {
+      "name": "v2ray-geodata",
+      "repo": "kenzok8/wall",
+      "branch": "main",
+      "special": "pkg",
+      "prune": ["v2ray-geoip", "v2ray-geosite"]
+    }
   },
   "commonFeeds": ["vantage", "lucky", "partexp", "viking"],
   "profiles": {
@@ -32,8 +40,8 @@
       "feeds": ["helloworld"]
     },
     "dpd": {
-      "packages": ["luci-app-dpd", "dpd-fastpath", "dpd-napi", "dpd-acl", "dpd-qos", "dpd-mwan"],
-      "feeds": ["dpd-fw"]
+      "packages": ["luci-app-dpd", "dpd-fastpath", "dpd-napi", "dpd-acl", "dpd-qos", "dpd-mwan", "honk"],
+      "feeds": ["dpd-fw", "honk", "v2ray-geodata"]
     }
   },
   "builds": [
