@@ -41,7 +41,12 @@
     },
     "dpd": {
       "packages": ["luci-app-dpd", "dpd-fastpath", "dpd-napi", "honk", "luci-app-honk"],
-      "feeds": ["dpd-fw", "honk", "v2ray-geodata"]
+      "feeds": ["dpd-fw", "honk", "v2ray-geodata"],
+      "kernelConfig": [
+        "CONFIG_KERNEL_DEBUG_INFO=y",
+        "CONFIG_KERNEL_DEBUG_INFO_REDUCED=n",
+        "CONFIG_KERNEL_DEBUG_INFO_BTF=y"
+      ]
     }
   },
   "builds": [
