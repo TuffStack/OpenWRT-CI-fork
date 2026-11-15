@@ -40,7 +40,7 @@
       "feeds": ["helloworld"]
     },
     "dpd": {
-      "packages": ["luci-app-dpd", "dpd-fastpath", "dpd-napi", "honk"],
+      "packages": ["luci-app-dpd", "dpd-fastpath", "dpd-napi", "honk", "luci-app-honk"],
       "feeds": ["dpd-fw", "honk", "v2ray-geodata"]
     }
   },

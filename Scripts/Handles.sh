@@ -61,3 +61,26 @@ fi
 #修改natmapt菜单位置
 FIX "natmapt" "$PACKAGE_PATH/luci-app-natmapt" sed -i "s/network/services/g" \
 	"$PACKAGE_PATH/luci-app-natmapt/root/usr/share/luci/menu.d/luci-app-natmap.json"
+
+# dpd-fw 的 luci-app-dpd 把「打开 Honk」按钮写死到 admin/network/proxy，
+# 但该节点只在 files/menu-network.json 里定义，Makefile 根本没安装它
+# （装进固件的只有 luci-app-dpd.json 的 admin/network/dpd），点按钮必然
+# "No page is registered"。honk 自己的 LuCI 页面是 admin/services/honk。
+# setup_dpd_feed 用符号链接指向 pkgcache，先实体化再 sed，避免污染缓存源码。
+DPD_LUCI="$PACKAGE_PATH/dpd-fw/luci-app-dpd"
+DPD_VIEW="$DPD_LUCI/htdocs/luci-static/resources/view/dpd"
+if [ -d "$DPD_VIEW" ]; then
+	if [ -L "$DPD_LUCI" ]; then
+		mkdir -p "$DPD_LUCI.ci"
+		cp -rL "$DPD_LUCI/." "$DPD_LUCI.ci/"
+		rm -f "$DPD_LUCI"
+		mv -f "$DPD_LUCI.ci" "$DPD_LUCI"
+	fi
+	find "$DPD_VIEW" -maxdepth 1 -type f -name '*.js' -exec \
+		sed -i 's|admin/network/proxy|admin/services/honk|g' {} +
+	if grep -rq "admin/services/honk" "$DPD_VIEW"; then
+		echo "dpd-luci: Honk 按钮已指向 admin/services/honk"
+	else
+		echo "::warning::dpd-luci 未找到可修补的 Honk 按钮（上游可能已改路径）"
+	fi
+fi

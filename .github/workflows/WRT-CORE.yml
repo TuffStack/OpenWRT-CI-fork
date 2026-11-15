@@ -100,6 +100,16 @@ jobs:
             echo "::warning::缺少编译依赖:$DEPS_MISSING (Debian: sudo apt install -y git ccache build-essential file python3 dos2unix)"
           fi
 
+          # 内核 oldconfig 会调用 pahole --version；缺 libdw.so.1 时它输出为空，
+          # init/Kconfig 的 $(shell,...) 展开为空会直接 syntax error。提前告警，
+          # 免得每次都等到 toolchain/kernel-headers 才暴露。
+          if command -v pahole > /dev/null 2>&1; then
+            pahole --version > /dev/null 2>&1 || \
+              echo "::warning::宿主机 pahole 无法执行，请检查 libdw.so.1（Debian: sudo apt install -y libdw1 dwarves）"
+          elif ! ldconfig -p 2>/dev/null | grep -q 'libdw\.so\.1'; then
+            echo "::warning::宿主机找不到 libdw.so.1，host 工具链可能缺 elfutils 运行库"
+          fi
+
           # 基础工具自检：sed 挂掉会导致 prepare-tmpinfo 必失败
           for t in sed find xargs awk grep; do
             command -v "$t" > /dev/null || { echo "::error::$t missing"; exit 1; }
@@ -267,8 +277,15 @@ jobs:
           mkdir -p "${GOCACHE:-/mnt/wrt/go/build}" "${GOMODCACHE:-/mnt/wrt/go/mod}"
           mkdir -p "$GITHUB_WORKSPACE/build-reports"
 
-          make -j$(nproc) BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/parallel.tsv" || \
+          # 内核 oldconfig 用 $(shell,pahole-version.sh) 探测版本；pahole 坏了会让
+          # init/Kconfig 语法错误，toolchain/kernel-headers 直接失败，先自检修复
+          $GITHUB_WORKSPACE/.github/scripts/prepare-pahole.sh
+
+          make -j$(nproc) BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/parallel.tsv" || {
+            # 全量重编时 host 工具（含 pahole）可能到这一步才生成，串行重试前再修一次
+            $GITHUB_WORKSPACE/.github/scripts/prepare-pahole.sh
             make -j1 V=s BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/serial.tsv"
+          }
 
           if [ -x ./staging_dir/host/bin/ccache ]; then
             CCACHE_DIR="${CCACHE_DIR:-/mnt/wrt/ccache}" ./staging_dir/host/bin/ccache -s
@@ -333,7 +350,7 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@master
         with: &REL_INPUTS
-          tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_DATE}}
+          tag_name: ${{env.WRT_DATE}}-${{env.WRT_CONFIG}}
           files: ./wrt/upload/*.*
           overwrite_files: true
           body: |
