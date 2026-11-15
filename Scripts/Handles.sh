@@ -27,8 +27,8 @@ FIX "theme-vantage" "$PACKAGE_PATH/luci-theme-vantage" sed -i \
 	-e '/^\/\* progress bars: thin track/,$ { /^\.cbi-progressbar::before {/,/^}/ { s/^[[:space:]]*font: 500 var(--fs-micro)\/1\.2 var(--mono);/\tfont: inherit; line-height: normal;/; } }' \
 	"$PACKAGE_PATH/luci-theme-vantage/luci-theme-vantage/htdocs/luci-static/vantage/vantage.css"
 
-LUCKY_VER="${LUCKY_VER:-3.1.3}"
-LUCKY_BETA="${LUCKY_BETA:-beta}"
+LUCKY_VER="${LUCKY_VER:-3.8.1}"
+LUCKY_BETA="${LUCKY_BETA:-}"
 LUCKY_TAG="${LUCKY_TAG:-lucky_docker}"
 LUCKY_BASE="https://release.66666.host/v${LUCKY_VER}${LUCKY_BETA}/${LUCKY_VER}_${LUCKY_TAG}"
 LUCKY_MK="$(find "$PACKAGE_PATH" -maxdepth 4 -type f -wholename '*/lucky/Makefile' -print -quit 2>/dev/null)"

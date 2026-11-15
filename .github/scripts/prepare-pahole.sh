@@ -16,6 +16,18 @@ HOST_BIN="$PWD/staging_dir/host/bin"
 HOST_LIB="$PWD/staging_dir/host/lib"
 LIBDW="$HOST_LIB/libdw.so.1"
 
+# 上一轮兜底可能把真 pahole 换成了 stub。宿主机 libdw1 修好后要能自动恢复，
+# 否则 PAHOLE_VERSION 会一直是 0，BTF 被静默关掉。
+if [ -f "$HOST_BIN/pahole" ] && grep -q 'disabled by CI' "$HOST_BIN/pahole" 2>/dev/null; then
+	if [ -x "$HOST_BIN/pahole.disabled" ]; then
+		mv -f "$HOST_BIN/pahole.disabled" "$HOST_BIN/pahole"
+		echo "pahole: 已从上一轮兜底恢复真二进制"
+	else
+		rm -f "$HOST_BIN/pahole"
+		echo "::warning::上一轮 pahole stub 无备份，已删除；请重建 tools/dwarves 以恢复 BTF"
+	fi
+fi
+
 # make 内部的 PATH 以 staging_dir/host/bin 开头，它比宿主机 /usr/bin/pahole 优先
 CANDIDATES=()
 [ -x "$HOST_BIN/pahole" ] && CANDIDATES+=("$HOST_BIN/pahole")
@@ -97,6 +109,10 @@ fi
 
 # 兜底：显式声明 pahole 不可用。--version 返回 v0.0 让 Kconfig 拿到合法整数，
 # 其它调用直接失败（不静默产出坏 BTF）；PAHOLE_VERSION=0 会让 BTF 选项自动关闭。
+# 先留一份真二进制，宿主机 libdw1 修好后下一轮可自动恢复。
+if [ -f "$HOST_BIN/pahole" ] && ! grep -q 'disabled by CI' "$HOST_BIN/pahole" 2>/dev/null; then
+	mv -f "$HOST_BIN/pahole" "$HOST_BIN/pahole.disabled"
+fi
 cat > "$HOST_BIN/pahole" <<'EOF'
 #!/bin/sh
 if [ "$1" = "--version" ]; then
