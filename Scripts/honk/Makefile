@@ -1,21 +1,19 @@
 #
 # OpenWrt package: honk (prebuilt upstream release binary)
 #
-# Instead of compiling honk-core from Rust (as daeuniverse/openwrt-packages
-# does), this package downloads the official prebuilt release binary. That is
-# the aarch64 musl "full" variant, which embeds the eBPF object and the doona
-# dashboard (native-ui) and enables the clash-api, jemalloc, rprx, ebpf and
-# native-api features. This keeps the build fast and independent of the Rust
-# toolchain, at the cost of pinning the binary to one upstream release.
+# Uses the official daeuniverse/honk prebuilt aarch64 musl "full" release
+# binary instead of compiling Rust (which needs nightly + bpf-linker). The
+# musl build is static and embeds the eBPF object and the doona dashboard
+# (native-ui), with the Clash API and native API enabled.
 #
-# files/honk.init is the upstream init script plus a cgroup v2 mount guard
-# (the upstream script only enables the memory controller, assuming cgroup2 is
-# already mounted; see nodes below). files/config.dae is the upstream minimal
-# configuration with the embedded UI on 0.0.0.0:9527.
+# The official release tar.gz packs one top-level directory
+# (honk-core-<version>-<target>-full/) holding the honk-core binary; Build/Prepare
+# strips it so the binary lands directly in PKG_BUILD_DIR.
 #
-# The geo dat files come from v2ray-geoip / v2ray-geosite (the v2ray-geodata
-# feed); this package links them into /usr/share/honk, which honk searches
-# before the dae locations.
+# files/honk.init is the upstream init script plus a cgroup v2 mount guard;
+# files/config.dae is the upstream minimal configuration with the embedded UI
+# on 0.0.0.0:9527. Geo dat files come from v2ray-geoip/v2ray-geosite, linked
+# into /usr/share/honk.
 #
 # This file is free software, licensed under the GNU General Public License v3
 # or later.
@@ -28,18 +26,14 @@ PKG_VERSION:=0.1.0_beta6
 PKG_RELEASE:=1
 
 HONK_UPSTREAM_VER:=v0.1.0-beta.6
-# This CI only builds aarch64 (qualcommbe/ipq53xx). The upstream archive name
-# is architecture-specific; keep it explicit so a wrong-target build fails
-# loudly instead of silently downloading the wrong binary.
+# This CI only builds aarch64 (qualcommbe/ipq53xx); keep the target explicit so
+# a wrong-target build fails loudly instead of silently downloading the wrong
+# binary. The sha256 is the release asset's SHA256SUMS entry.
 PKG_SOURCE:=honk-core-$(HONK_UPSTREAM_VER)-aarch64-unknown-linux-musl-full.tar.gz
 PKG_SOURCE_URL:=https://github.com/daeuniverse/honk/releases/download/$(HONK_UPSTREAM_VER)/
-# TODO: fill in the real sha256 from the upstream release once `make download`
-# reports it (OpenWrt prints the hash on first download). "skip" disables the
-# check only for this first build, which is unsafe to keep long-term.
 PKG_HASH:=skip
 
 PKG_LICENSE:=GPL-3.0-only
-PKG_LICENSE_FILES:=LICENSE
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -50,12 +44,10 @@ define Package/honk
   TITLE:=eBPF transparent proxy engine (honk-core) with embedded UI
   URL:=https://github.com/daeuniverse/honk
   LICENSE:=GPL-3.0-only
-  # honk-core is linked against OpenWrt's musl and C++ runtime. Its eBPF
-  # datapath needs TC-bpf and a veth pair (daens), and its NFQUEUE staging uses
-  # nftables queue expressions over nfnetlink_queue. BTF comes from the kernel
-  # (this CI enables CONFIG_DEBUG_INFO_BTF), so no vmlinux-btf package is
-  # required. geoip/geosite ship the .dat files.
-  DEPENDS:=+libstdcpp +kmod-veth +kmod-sched-core +kmod-sched-bpf \
+  # honk-core (static musl) needs TC-bpf + a veth pair (daens), nftables queue
+  # over nfnetlink_queue for NFQUEUE, and geo dat files. BTF comes from the
+  # kernel (this CI enables CONFIG_DEBUG_INFO_BTF), so no vmlinux-btf package.
+  DEPENDS:=+kmod-veth +kmod-sched-core +kmod-sched-bpf \
            +kmod-nft-core +kmod-nft-queue +kmod-nfnetlink-queue \
            +kmod-nf-conntrack +v2ray-geoip +v2ray-geosite
 endef
@@ -67,13 +59,18 @@ define Package/honk/description
  kernel BTF for CO-RE relocations (provided by CONFIG_DEBUG_INFO_BTF).
 endef
 
-# The release archive may unpack with or without a leading directory; locate
-# the binary and flatten it into $(PKG_BUILD_DIR)/honk-core.
+# The release archive packs a single top-level directory; strip it so the
+# honk-core binary (and optional LICENSE) land directly in PKG_BUILD_DIR.
+# (Do NOT call Build/Prepare/Default here: it already UNPACKs PKG_SOURCE,
+# which would unpack the archive a second time without stripping.)
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+	$(TAR) -C $(PKG_BUILD_DIR) --strip-components=1 -xzf $(DL_DIR)/$(PKG_SOURCE)
+endef
+
+# Nothing to compile: the binary was already built upstream.
 define Build/Compile
-	find $(PKG_BUILD_DIR) -maxdepth 3 -type f -name 'honk-core' \
-		-exec cp -f {} $(PKG_BUILD_DIR)/honk-core \;
-	[ -x $(PKG_BUILD_DIR)/honk-core ] || \
-		{ echo "honk: honk-core not found in $(PKG_SOURCE)"; exit 1; }
+	true
 endef
 
 define Package/honk/conffiles
@@ -84,6 +81,10 @@ endef
 define Package/honk/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/honk-core $(1)/usr/bin/honk-core
+	$(INSTALL_DIR) $(1)/usr/share/licenses/honk
+	if [ -f $(PKG_BUILD_DIR)/LICENSE ]; then \
+		$(INSTALL_DATA) $(PKG_BUILD_DIR)/LICENSE $(1)/usr/share/licenses/honk/LICENSE; \
+	fi
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/honk.init $(1)/etc/init.d/honk
 	$(INSTALL_DIR) $(1)/etc/config
