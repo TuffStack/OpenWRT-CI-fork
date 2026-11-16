@@ -97,7 +97,8 @@ else
 fi
 
 #RE-CS-08: 内核 FIT 压缩方式 gzip -> lzma
-#原因：KERNEL_SIZE=6144k，gzip 压缩得到的 uImage.itb 可能超限，改用 lzma 进一步压缩体积
+#原因：上游当前 KERNEL_SIZE=7168k；开启 DEBUG_INFO/BTF 后 gzip 的 uImage.itb 仍可能逼近上限，
+#保留 lzma 作为体积余量（历史上 6144k 时就是为这个目的引入的）
 if [[ "${WRT_TARGET^^}" == *"QUALCOMMBE"* ]]; then
 	IPQ53XX_MK="./target/linux/qualcommbe/image/ipq53xx.mk"
 	if [ -f "$IPQ53XX_MK" ] && grep -q '^define Device/jdcloud_re-cs-08$' "$IPQ53XX_MK"; then

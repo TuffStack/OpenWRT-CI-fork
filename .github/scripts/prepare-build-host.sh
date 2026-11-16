@@ -4,8 +4,9 @@
 
 set -euo pipefail
 
-# 宿主机的 Go / LLVM 只是“能省时间就省”的引导件：不同源码（如大雕 LEDE）未必用到这些配置项，
-# runner 上也可能没装工具，探测不到就跳过，不能在这里把整个构建刷掉
+# 宿主机的 Go 只是“能省时间就省”的引导件：不同源码（如大雕 LEDE）未必用到这些配置项，
+# runner 上也可能没装工具，探测不到就跳过，不能在这里把整个构建刷掉。
+# honk 已改用官方预编译二进制，不再有 Rust/BPF 源码编译，相关主机工具链逻辑已移除。
 GO_ROOT=""
 if command -v go > /dev/null 2>&1; then
 	GO_ROOT=$(go env GOROOT 2>/dev/null || true)
@@ -48,49 +49,6 @@ MAKE
 	esac
 fi
 
-LLVM_ROOT=""
-if command -v llvm-config > /dev/null 2>&1; then
-	LLVM_ROOT=$(llvm-config --prefix 2>/dev/null || true)
-fi
-
-BPF_READY=1
-if [ -z "$LLVM_ROOT" ]; then
-	BPF_READY=0
-else
-	for tool in clang llc opt llvm-dis llvm-strip; do
-		[ -x "$LLVM_ROOT/bin/$tool" ] || BPF_READY=0
-	done
-fi
-
-LLVM_SMOKE="${RUNNER_TEMP:-/tmp}/wrt-bpf-smoke"
-if [ "$BPF_READY" = 1 ]; then
-	mkdir -p "$LLVM_SMOKE"
-	printf 'int wrt_bpf_smoke(void) { return 0; }\n' > "$LLVM_SMOKE/smoke.c"
-	# 冒烟测试通过才敢把 CONFIG_BPF_TOOLCHAIN_HOST 写进 .config
-	if ! {
-		"$LLVM_ROOT/bin/clang" --target=bpfel -O2 -emit-llvm -c \
-			"$LLVM_SMOKE/smoke.c" -o "$LLVM_SMOKE/smoke.bc" &&
-		"$LLVM_ROOT/bin/opt" -O2 -mtriple=bpfel \
-			< "$LLVM_SMOKE/smoke.bc" > "$LLVM_SMOKE/smoke.opt" &&
-		"$LLVM_ROOT/bin/llvm-dis" \
-			< "$LLVM_SMOKE/smoke.opt" > "$LLVM_SMOKE/smoke.S" &&
-		"$LLVM_ROOT/bin/llc" -march=bpfel -mcpu=v3 -filetype=obj \
-			-o "$LLVM_SMOKE/smoke.o" < "$LLVM_SMOKE/smoke.S" &&
-		"$LLVM_ROOT/bin/llvm-strip" --strip-debug "$LLVM_SMOKE/smoke.o"
-	}; then
-		BPF_READY=0
-		echo "::warning::宿主机 LLVM 无法编译 bpfel 冒烟用例，不用它做 BPF 工具链"
-	fi
-fi
-
-if [ "$BPF_READY" = 1 ]; then
-	# Use one host LLVM installation for every BPF build tool on all targets.
-	sed -i '/^CONFIG_BPF_TOOLCHAIN_/d; /^# CONFIG_BPF_TOOLCHAIN_.* is not set$/d' .config
-	printf 'CONFIG_BPF_TOOLCHAIN_HOST=y\nCONFIG_BPF_TOOLCHAIN_HOST_PATH="%s"\n' "$LLVM_ROOT" >> .config
-else
-	echo "::warning::宿主机 LLVM/BPF 工具链不可用，BPF 工具链配置保持源码默认"
-fi
-
 REPORT_DIR="${GITHUB_WORKSPACE:-$PWD}/build-reports"
 mkdir -p "$REPORT_DIR"
 {
@@ -104,11 +62,5 @@ mkdir -p "$REPORT_DIR"
 		printf 'Host Python PGO: %s\n' "$PGO_STATE"
 	else
 		printf 'Host Python PGO: not applicable\n'
-	fi
-	if [ "${BPF_READY:-0}" = 1 ]; then
-		printf 'BPF LLVM prefix: %s\n' "$LLVM_ROOT"
-		"$LLVM_ROOT/bin/clang" --version
-	else
-		printf 'BPF LLVM: not used (host LLVM unavailable)\n'
 	fi
 } | tee "$REPORT_DIR/host-toolchains.txt"

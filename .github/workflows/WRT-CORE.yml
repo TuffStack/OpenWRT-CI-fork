@@ -251,13 +251,6 @@ jobs:
             make clean -j$(nproc)
           fi
 
-      - name: Prepare Rust Toolchain
-        if: ${{ !inputs.WRT_TEST }}
-        run: |
-          cd ./wrt/
-
-          $GITHUB_WORKSPACE/.github/scripts/prepare-rust.sh
-
       - name: Download Packages
         if: ${{ !inputs.WRT_TEST }}
         run: |
@@ -284,11 +277,36 @@ jobs:
           # init/Kconfig 语法错误，toolchain/kernel-headers 直接失败，先自检修复
           $GITHUB_WORKSPACE/.github/scripts/prepare-pahole.sh
 
+          # honk 的 eBPF CO-RE 依赖内核 BTF，而 DEBUG_INFO_BTF 又依赖可用 pahole。
+          # prepare-pahole.sh 在 libdw 缺失时会退成 v0.0 stub，Kconfig 会静默关掉 BTF。
+          # 对 .config 里显式要求 BTF 的固件提前失败，避免白编一轮才发现功能不可用。
+          if grep -Fxq 'CONFIG_KERNEL_DEBUG_INFO_BTF=y' .config; then
+            PAHOLE_VER="$(PATH="$PWD/staging_dir/host/bin:$PATH" pahole --version 2>/dev/null || true)"
+            if [ "$PAHOLE_VER" = "v0.0" ]; then
+              echo "::error::本固件要求内核 BTF，但 pahole 已被兜底禁用（--version='v0.0'）。请安装同版本 libdw1/libelf1 或重建 tools/elfutils"
+              exit 1
+            fi
+            # 全量重编时 tools/dwarves 还没产出 pahole 是正常的，编译后再校验内核 .config
+            [ -n "$PAHOLE_VER" ] && echo "BTF precheck: pahole $PAHOLE_VER" || echo "BTF precheck: pahole 尚未就绪，编译后校验内核 .config"
+          fi
+
           make -j$(nproc) BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/parallel.tsv" || {
             # 全量重编时 host 工具（含 pahole）可能到这一步才生成，串行重试前再修一次
             $GITHUB_WORKSPACE/.github/scripts/prepare-pahole.sh
             make -j1 V=s BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/serial.tsv"
           }
+
+          # OpenWrt 符号 =y 不代表内核最终 Kconfig 真的接受了 BTF（依赖不满足会被关掉）。
+          # 直接检查生成出来的内核 .config，失败就让 CI 红，而不是产出"能编译但跑不了"的固件。
+          if grep -Fxq 'CONFIG_KERNEL_DEBUG_INFO_BTF=y' .config; then
+            KERNEL_DOTCONFIG="$(find ./build_dir -type f -path '*/linux-*/linux-*/.config' -print -quit 2>/dev/null)"
+            [ -n "$KERNEL_DOTCONFIG" ] || { echo "::error::找不到内核 .config，无法校验 BTF"; exit 1; }
+            grep -Fxq 'CONFIG_DEBUG_INFO_BTF=y' "$KERNEL_DOTCONFIG" || {
+              echo "::error::$KERNEL_DOTCONFIG 未启用 CONFIG_DEBUG_INFO_BTF；honk 的 eBPF CO-RE 无法工作。检查 pahole 版本或 KERNEL_DEBUG_INFO_BTF 依赖"
+              exit 1
+            }
+            echo "BTF verified: $KERNEL_DOTCONFIG"
+          fi
 
           if [ -x ./staging_dir/host/bin/ccache ]; then
             CCACHE_DIR="${CCACHE_DIR:-/mnt/wrt/ccache}" ./staging_dir/host/bin/ccache -s
