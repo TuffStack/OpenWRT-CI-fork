@@ -34,6 +34,7 @@ PKG_SOURCE_URL:=https://github.com/daeuniverse/honk/releases/download/$(HONK_UPS
 PKG_HASH:=skip
 
 PKG_LICENSE:=GPL-3.0-only
+PKG_LICENSE_FILES:=LICENSE
 
 include $(INCLUDE_DIR)/package.mk
 

@@ -278,9 +278,15 @@ jobs:
           $GITHUB_WORKSPACE/.github/scripts/prepare-pahole.sh
 
           # honk 的 eBPF CO-RE 依赖内核 BTF，而 DEBUG_INFO_BTF 又依赖可用 pahole。
-          # prepare-pahole.sh 在 libdw 缺失时会退成 v0.0 stub，Kconfig 会静默关掉 BTF。
-          # 对 .config 里显式要求 BTF 的固件提前失败，避免白编一轮才发现功能不可用。
-          if grep -Fxq 'CONFIG_KERNEL_DEBUG_INFO_BTF=y' .config; then
+          # 开关必须从 builds.json 读，不能只看 .config：如果 defconfig 因依赖没满足
+          # 把符号关掉，用 .config 做判断会让校验自己一起消失（正是要防的静默失效）。
+          BTF_REQUIRED="$(python3 -c 'import json,sys; c=json.load(open(sys.argv[1],encoding="utf-8")); p=c["profiles"].get(sys.argv[2],{}); print("1" if any(x.strip()=="CONFIG_KERNEL_DEBUG_INFO_BTF=y" for x in p.get("kernelConfig",[])) else "")' "$GITHUB_WORKSPACE/Config/builds.json" "$WRT_PROFILE")"
+          if [ -n "$BTF_REQUIRED" ]; then
+            grep -Fxq 'CONFIG_KERNEL_DEBUG_INFO_BTF=y' .config || {
+              echo "::error::$WRT_PROFILE 要求内核 BTF，但 defconfig 没有保留 CONFIG_KERNEL_DEBUG_INFO_BTF=y（检查 DEBUG_INFO / DEBUG_INFO_REDUCED 依赖）"
+              exit 1
+            }
+            # prepare-pahole.sh 在 libdw 缺失时会退成 v0.0 stub，Kconfig 会静默关掉 BTF
             PAHOLE_VER="$(PATH="$PWD/staging_dir/host/bin:$PATH" pahole --version 2>/dev/null || true)"
             if [ "$PAHOLE_VER" = "v0.0" ]; then
               echo "::error::本固件要求内核 BTF，但 pahole 已被兜底禁用（--version='v0.0'）。请安装同版本 libdw1/libelf1 或重建 tools/elfutils"
@@ -298,7 +304,7 @@ jobs:
 
           # OpenWrt 符号 =y 不代表内核最终 Kconfig 真的接受了 BTF（依赖不满足会被关掉）。
           # 直接检查生成出来的内核 .config，失败就让 CI 红，而不是产出"能编译但跑不了"的固件。
-          if grep -Fxq 'CONFIG_KERNEL_DEBUG_INFO_BTF=y' .config; then
+          if [ -n "$BTF_REQUIRED" ]; then
             KERNEL_DOTCONFIG="$(find ./build_dir -type f -path '*/linux-*/linux-*/.config' -print -quit 2>/dev/null)"
             [ -n "$KERNEL_DOTCONFIG" ] || { echo "::error::找不到内核 .config，无法校验 BTF"; exit 1; }
             grep -Fxq 'CONFIG_DEBUG_INFO_BTF=y' "$KERNEL_DOTCONFIG" || {
