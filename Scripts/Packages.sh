@@ -79,41 +79,31 @@ UPDATE_PACKAGE() {
 	fi
 }
 
-# dpd-fw 根目录按层组织（bpf/ plugins/ userspace/ openwrt/），不是 flat feed，
-# 直接 clone 到 package/ 或 src-git 都扫不到包。按官方 openwrt/feed/README.md 的
-# Option B，把每个含 Makefile 的源目录以 PKG_NAME 链接进 package/dpd-fw/。
-setup_dpd_feed() {
+# 官方 honk：核心用本地预编译二进制包（Scripts/honk/，Makefile 直接下载
+# daeuniverse/honk 的官方 release 二进制，不编译 Rust）；LuCI 页从官方
+# daeuniverse/openwrt-packages 复制 luci-app-honk + luci-lib-daeuniverse（纯
+# JS/JSON，无需 Lua/Rust 工具链）。这样彻底去掉对 kenzok8/openwrt-honk 的依赖。
+setup_honk_official() {
 	local REPO="$1" BRANCH="$2"
 	clone_or_update "$REPO" "$BRANCH"
 	local SRC="$PKG_SRC_DIR"
-	local DEST="./package/dpd-fw"
-	local -A DPD_MAP=(
-		[dpd-fastpath]="bpf/core"
-		[dpd-napi]="userspace/dpd-napi"
-		[router-acl]="plugins/dpd-acl"
-		[einat-ebpf]="plugins/dpd-einat"
-		[dpd-einat-sync]="plugins/dpd-einat-sync"
-		[dpd-honk]="plugins/dpd-honk"
-		[dpd-observe]="plugins/dpd-observe"
-		[router-qos]="plugins/dpd-qos"
-		[router-tuning]="plugins/dpd-tuning"
-		[dpd-acl]="openwrt/meta/dpd-acl"
-		[dpd-mwan]="openwrt/meta/dpd-mwan"
-		[dpd-qos]="openwrt/meta/dpd-qos"
-		[luci-app-dpd]="openwrt/luci-app-dpd"
-	)
 
-	rm -rf "$DEST"
-	mkdir -p "$DEST"
-	local NAME COUNT=0
-	for NAME in "${!DPD_MAP[@]}"; do
-		if [ -f "$SRC/${DPD_MAP[$NAME]}/Makefile" ]; then
-			ln -sfn "$SRC/${DPD_MAP[$NAME]}" "$DEST/$NAME"
-			COUNT=$((COUNT + 1))
-		fi
+	# 官方 LuCI 包
+	rm -rf ./package/luci-app-honk ./package/luci-lib-daeuniverse
+	local p
+	for p in luci-app-honk luci-lib-daeuniverse; do
+		[ -f "$SRC/$p/Makefile" ] && cp -rf "$SRC/$p" "./package/$p" \
+			|| echo "::warning::官方源缺 $p（上游结构变化）"
 	done
-	echo "dpd-fw: linked $COUNT packages into $DEST"
-	[ "$COUNT" -gt 0 ] || { echo "::error::dpd-fw 包目录结构变化，未找到任何 Makefile"; exit 1; }
+
+	# honk 核心：本仓库自带的本地包（脚本同目录下 honk/）
+	local LOCAL="$(cd "$(dirname "$0")" && pwd)/honk"
+	rm -rf ./package/honk
+	if [ -f "$LOCAL/Makefile" ]; then
+		cp -rf "$LOCAL" ./package/honk
+	else
+		echo "::error::本地 honk 包缺失：$LOCAL"; exit 1
+	fi
 }
 
 # 正常由 plan 作业注入；本地单独调试时回退到清单按 profile 取值
@@ -153,7 +143,7 @@ while IFS='|' read -r F_NAME F_REPO F_BRANCH F_SPECIAL F_PRUNE F_MODE; do
 	[ -n "$F_NAME" ] || continue
 	case "$F_MODE" in
 		package)   UPDATE_PACKAGE "$F_NAME" "$F_REPO" "$F_BRANCH" "$F_SPECIAL" "$F_PRUNE" ;;
-		dpd-index) setup_dpd_feed "$F_REPO" "$F_BRANCH" ;;
+		honk-official) setup_honk_official "$F_REPO" "$F_BRANCH" ;;
 		*)         echo "::error::未知包源模式 $F_MODE（$F_NAME）"; exit 1 ;;
 	esac
 done < "$FEEDS_TSV"

@@ -67,7 +67,7 @@ fi
 {
 	cat "$CFG_DIR/BASE.txt"
 	# VIKINGYFY 源码在 qualcommbe 上默认关 DEBUG_INFO_BTF（BUILDBOT + target 白名单），
-	# 且 DEBUG_INFO_REDUCED 默认 y，而 BTF 依赖 !REDUCED。honk / DPD 的 eBPF CO-RE
+	# 且 DEBUG_INFO_REDUCED 默认 y，而 BTF 依赖 !REDUCED。honk 的 eBPF CO-RE
 	# 必须有内核 BTF，因此只允许需要的 profile 通过 kernelConfig 显式开启。
 	python3 -c '
 import json, sys
@@ -103,7 +103,7 @@ python3 -c 'import json,sys; cfg=json.load(open(sys.argv[1],encoding="utf-8")); 
 	"$CFG_DIR/builds.json" | sort -u > "$APP_PKGS"
 
 # 归一：只压白名单外的应用层插件（LuCI 应用 / 主题 / 其它固件的插件包）。
-# 依赖类包（kmod-netlink-diag、xray-core、dpd-observe 等）保持 =y，
+# 依赖类包（kmod-netlink-diag、xray-core 等）保持 =y，
 # 由 OpenWrt 的依赖解析决定，绝不在这里动它们。
 awk -v allow="$ALLOW" -v apps="$APP_PKGS" '
 	BEGIN {

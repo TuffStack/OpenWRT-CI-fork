@@ -58,7 +58,7 @@ https://drive.wrt.moe/uboot/mediatek
 | --- | --- | --- |
 | `VIKINGYFY-IPQ53XX-HP` | VIKINGYFY/immortalwrt (owrt) | homeproxy |
 | `VIKINGYFY-IPQ53XX-NIKKI` | VIKINGYFY/immortalwrt (owrt) | nikki(mihomo) |
-| `VIKINGYFY-IPQ53XX-DPD` | VIKINGYFY/immortalwrt (owrt) | dpd-fw（DPD 加速） |
+| `VIKINGYFY-IPQ53XX-HONK` | VIKINGYFY/immortalwrt (owrt) | honk（eBPF 透明代理） |
 | `VIKINGYFY-IPQ53XX-SSR` | VIKINGYFY/immortalwrt (owrt) | helloworld / SSR-Plus |
 | `LEDE-IPQ53XX-HP` | coolsnowwolf/lede (master) | homeproxy |
 | `LEDE-IPQ53XX-NIKKI` | coolsnowwolf/lede (master) | nikki(mihomo) |
@@ -70,19 +70,21 @@ ER2 的硬件修补（MAC 分区名 factory→0:ART、SFP 改 fixed-link 2500bas
 
 全系默认带 Docker；MosDNS 默认不安装。
 
-`VIKINGYFY-IPQ53XX-DPD` 与 `VIKINGYFY-IPQ53XX-SSR` 目前只挂在自用版源码上；
+`VIKINGYFY-IPQ53XX-HONK` 与 `VIKINGYFY-IPQ53XX-SSR` 目前只挂在自用版源码上；
 需要大雕版时，在 `Config/builds.json` 的 `builds` 数组里加一行即可。
 
-> `kwrum1/dpd-fw` 不是 flat feed，`Scripts/Packages.sh` 会按其官方
-> `openwrt/feed/README.md` 的 Option B，把各包目录以 `PKG_NAME` 链接进 `package/dpd-fw/`。
-> 该源部分包依赖上游预编译产物，首次构建请留意构建报告里的 `packages-*.txt`。
+> `VIKINGYFY-IPQ53XX-HONK` 的 honk 采用官方 `daeuniverse/honk` 的预编译 release 二进制
+> （aarch64 musl full 变体，内嵌 eBPF 对象与 doona 面板，无需编译 Rust）；LuCI 页
+> `luci-app-honk` / `luci-lib-daeuniverse` 来自官方 `daeuniverse/openwrt-packages`。
+> 核心包位于 `Scripts/honk/`，构建时由 `Scripts/Packages.sh` 的 `honk-official` 模式接入。
+> 首次构建请按 `Scripts/honk/Makefile` 的提示回填官方 release 二进制的 sha256。
 
 ## 手动编译
 
 Actions → Run workflow → `IPQ53XX-Build`：
 
 - `SOURCE`：选择上游（ALL / VIKINGYFY / LEDE）
-- `PROFILE`：选择插件组合（ALL / homeproxy / nikki / helloworld / dpd）
+- `PROFILE`：选择插件组合（ALL / homeproxy / nikki / helloworld / honk）
 - 两项都选 ALL 即定时自动编译的全量组合；只想要单个固件就分别选具体值。
 - `TEST`（仅输出配置文件）与 `WRT_CLEAN`（彻底重编）同样生效。
 

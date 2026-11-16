@@ -15,15 +15,7 @@
       "prune": ["axonhub", "gecoosac", "miniupnpd", "sing-box", "luci-app-homeproxy", "luci-app-timewol", "luci-app-upnp", "luci-app-wolplus", "luci-app-wolultra"]
     },
     "helloworld": { "name": "helloworld", "repo": "fw876/helloworld", "branch": "dev" },
-    "dpd-fw": { "name": "dpd-fw", "repo": "kwrum1/dpd-fw", "branch": "main", "mode": "dpd-index" },
-    "honk": { "name": "honk", "repo": "kenzok8/openwrt-honk", "branch": "main", "special": "pkg" },
-    "v2ray-geodata": {
-      "name": "v2ray-geodata",
-      "repo": "kenzok8/wall",
-      "branch": "main",
-      "special": "pkg",
-      "prune": ["v2ray-geoip", "v2ray-geosite"]
-    }
+    "honk": { "name": "honk", "repo": "daeuniverse/openwrt-packages", "branch": "main", "mode": "honk-official" }
   },
   "commonFeeds": ["vantage", "lucky", "partexp", "viking"],
   "profiles": {
@@ -39,9 +31,9 @@
       "packages": ["luci-app-ssr-plus"],
       "feeds": ["helloworld"]
     },
-    "dpd": {
-      "packages": ["luci-app-dpd", "dpd-fastpath", "dpd-napi", "honk", "luci-app-honk"],
-      "feeds": ["dpd-fw", "honk", "v2ray-geodata"],
+    "honk": {
+      "packages": ["honk", "luci-app-honk"],
+      "feeds": ["honk"],
       "kernelConfig": [
         "CONFIG_KERNEL_DEBUG_INFO=y",
         "CONFIG_KERNEL_DEBUG_INFO_REDUCED=n",
@@ -54,7 +46,7 @@
     { "name": "VIKINGYFY-IPQ53XX-NIKKI", "source": "VIKINGYFY", "profile": "nikki" },
     { "name": "LEDE-IPQ53XX-HP", "source": "LEDE", "profile": "homeproxy" },
     { "name": "LEDE-IPQ53XX-NIKKI", "source": "LEDE", "profile": "nikki" },
-    { "name": "VIKINGYFY-IPQ53XX-DPD", "source": "VIKINGYFY", "profile": "dpd" },
+    { "name": "VIKINGYFY-IPQ53XX-HONK", "source": "VIKINGYFY", "profile": "honk" },
     { "name": "VIKINGYFY-IPQ53XX-SSR", "source": "VIKINGYFY", "profile": "helloworld" }
   ]
 }
