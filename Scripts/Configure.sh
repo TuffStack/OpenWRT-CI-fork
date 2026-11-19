@@ -32,7 +32,17 @@ SOURCE_TAG="${SOURCE_TAG//\//-}"
 # 正常由 plan 作业注入；本地单独调试时回退到清单按 profile 取值
 if [ -z "${WRT_PACKAGES:-}" ]; then
 	BUILDS="$CFG_DIR/builds.json"
-	WRT_PACKAGES=$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1],encoding="utf-8"))["profiles"][sys.argv[2]]["packages"]))' "$BUILDS" "$PROFILE")
+	WRT_PACKAGES=$(python3 -c '
+import json, sys
+cfg = json.load(open(sys.argv[1], encoding="utf-8"))
+prof = cfg["profiles"][sys.argv[2]]
+src = sys.argv[3]
+key = src if src in cfg["sources"] else ""
+if not key:
+    key = next((k for k, v in cfg["sources"].items() if src.startswith(v["repo"])), "")
+pkgs = set(prof["packages"]) | set(cfg["sources"].get(key, {}).get("packages", []))
+print(json.dumps(sorted(pkgs)))
+' "$BUILDS" "$PROFILE" "${WRT_SOURCE:-}")
 fi
 python3 -c 'import json,sys; d=json.loads(sys.argv[1]); sys.exit(0 if isinstance(d,list) and d else 1)' "$WRT_PACKAGES" \
 	|| { echo "::error::WRT_PACKAGES 不是非空 JSON 数组: $WRT_PACKAGES"; exit 1; }

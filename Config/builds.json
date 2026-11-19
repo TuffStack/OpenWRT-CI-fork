@@ -1,7 +1,15 @@
 {
   "sources": {
-    "VIKINGYFY": { "repo": "VIKINGYFY/immortalwrt", "branch": "owrt" },
-    "LEDE": { "repo": "coolsnowwolf/lede", "branch": "master" }
+    "VIKINGYFY": {
+      "repo": "VIKINGYFY/immortalwrt",
+      "branch": "owrt",
+      "packages": ["luci-app-firewall", "fullconenat-sonic", "luci-app-fullconenat-sonic"]
+    },
+    "LEDE": {
+      "repo": "coolsnowwolf/lede",
+      "branch": "master",
+      "packages": ["kmod-nft-fullcone"]
+    }
   },
   "feeds": {
     "vantage": { "name": "vantage", "repo": "anothaDev/luci-theme-vantage", "branch": "main" },

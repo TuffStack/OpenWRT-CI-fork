@@ -71,7 +71,9 @@ def main() -> int:
             "profile": build["profile"],
             "repo": src["repo"],
             "branch": src["branch"],
-            "packages": prof["packages"],
+            # 上游专属包（如 VIKINGYFY 的 fullconenat-sonic / LEDE 的 kmod-nft-fullcone）
+            # 在 plan 阶段并入，Configure.sh 与所有 firmware 共用同一份白名单
+            "packages": sorted(set(src.get("packages", [])) | set(prof["packages"])),
             "feeds": [feeds[key] for key in feed_keys],
         })
 

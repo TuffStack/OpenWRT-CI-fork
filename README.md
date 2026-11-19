@@ -91,7 +91,7 @@ Config——自定义配置
 
 `Config/builds.json` 是唯一真源：
 
-- `sources`：上游仓库与分支
+- `sources`：上游仓库、分支与该源码专属包 `packages`（如 VIKINGYFY 的 `fullconenat-sonic`、LEDE 的 `kmod-nft-fullcone`）
 - `feeds`：所有可用包源（名称、仓库、分支、`mode`、`prune`）
 - `commonFeeds`：每个固件都要准备的基础包源
 - `profiles`：插件组合 —— 该组合额外安装的包 `packages` 与仅该组合需要的包源 `feeds`
@@ -134,6 +134,12 @@ Config——自定义配置
   由 OpenWrt 的依赖解析决定，避免误伤 `DEPENDS`。再校验白名单并导出包清单报告。
 
 两套源码（含大雕 LEDE 自带的插件）因此受同一份白名单控制，不再需要手写 `=n` 清单。
+
+VIKINGYFY 源码的 `fullconenat-sonic` 与 `kmod-nft-fullcone` 互斥，且两套源码提供的
+fullcone 实现不同：VIKINGYFY 用 `fullconenat-sonic`（含 LuCI 设置页），LEDE 用
+`kmod-nft-fullcone`（来自其 `fullconenat-nft`）。因此这两个包写在 `sources.<上游>.packages`，
+由 `plan-builds.py` 按构建并入白名单，不放进全局 `ENABLE.conf`，避免每次构建都因包不存在或
+依赖冲突而告警。
 
 > 若打包阶段报 `依赖的软件包 xxx 在所有仓库都未提供`，通常是某个依赖包被压成了 `=n`。
 > 对照构建报告 `packages-*.txt` 与 `Config/builds.json` 的 profile 包清单即可定位；
