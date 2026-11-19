@@ -52,14 +52,12 @@ https://drive.wrt.moe/uboot/mediatek
 
 固件信息里的时间为编译开始的时间，方便核对上游源码提交时间。
 
-当前仅编译 IPQ53XX(qualcommbe / JDCloud RE-CS-08，即京东云太乙Plus ER2) 系列，共输出六个固件：
+当前仅编译 IPQ53XX(qualcommbe / JDCloud RE-CS-08，即京东云太乙Plus ER2) 系列，共输出四个固件：
 
 | 固件 | 上游 | 插件组合 |
 | --- | --- | --- |
 | `VIKINGYFY-IPQ53XX-HP` | VIKINGYFY/immortalwrt (owrt) | homeproxy |
 | `VIKINGYFY-IPQ53XX-NIKKI` | VIKINGYFY/immortalwrt (owrt) | nikki(mihomo) |
-| `VIKINGYFY-IPQ53XX-HONK` | VIKINGYFY/immortalwrt (owrt) | honk（eBPF 透明代理） |
-| `VIKINGYFY-IPQ53XX-SSR` | VIKINGYFY/immortalwrt (owrt) | helloworld / SSR-Plus |
 | `LEDE-IPQ53XX-HP` | coolsnowwolf/lede (master) | homeproxy |
 | `LEDE-IPQ53XX-NIKKI` | coolsnowwolf/lede (master) | nikki(mihomo) |
 
@@ -70,21 +68,14 @@ ER2 的硬件修补（MAC 分区名 factory→0:ART、SFP 改 fixed-link 2500bas
 
 全系默认带 Docker；MosDNS 默认不安装。
 
-`VIKINGYFY-IPQ53XX-HONK` 与 `VIKINGYFY-IPQ53XX-SSR` 目前只挂在自用版源码上；
-需要大雕版时，在 `Config/builds.json` 的 `builds` 数组里加一行即可。
-
-> `VIKINGYFY-IPQ53XX-HONK` 的 honk 采用官方 `daeuniverse/honk` 的预编译 release 二进制
-> （aarch64 musl full 变体，内嵌 eBPF 对象与 doona 面板，无需编译 Rust）；LuCI 页
-> `luci-app-honk` / `luci-lib-daeuniverse` 来自官方 `daeuniverse/openwrt-packages`。
-> 核心包位于 `Scripts/honk/`，构建时由 `Scripts/Packages.sh` 的 `honk-official` 模式接入。
-> 首次构建请按 `Scripts/honk/Makefile` 的提示回填官方 release 二进制的 sha256。
+四个固件都由 `Config/builds.json` 的 `builds` 数组驱动；要增加或调整组合，只改清单即可。
 
 ## 手动编译
 
 Actions → Run workflow → `IPQ53XX-Build`：
 
 - `SOURCE`：选择上游（ALL / VIKINGYFY / LEDE）
-- `PROFILE`：选择插件组合（ALL / homeproxy / nikki / helloworld / honk）
+- `PROFILE`：选择插件组合（ALL / homeproxy / nikki）
 - 两项都选 ALL 即定时自动编译的全量组合；只想要单个固件就分别选具体值。
 - `TEST`（仅输出配置文件）与 `WRT_CLEAN`（彻底重编）同样生效。
 
@@ -101,16 +92,21 @@ Config——自定义配置
 `Config/builds.json` 是唯一真源：
 
 - `sources`：上游仓库与分支
-- `feeds`：所有可用包源（名称、仓库、分支、特殊模式、需清理的同名包）
-- `commonFeeds`：每个固件都要准备的基础包源（白名单包所需、以及需要清理冲突包的源）
+- `feeds`：所有可用包源（名称、仓库、分支、`mode`、`prune`）
+- `commonFeeds`：每个固件都要准备的基础包源
 - `profiles`：插件组合 —— 该组合额外安装的包 `packages` 与仅该组合需要的包源 `feeds`
 - `builds`：固件列表 —— 产物名 + 上游 + 插件组合
 
-`IPQ53XX-Build.yml` 的 `plan` 作业用 `python3` 读取清单，按手动输入过滤并生成构建矩阵，
+`Build.yml` 的 `plan` 作业用 `python3` 读取清单，按手动输入过滤并生成构建矩阵，
 再把展开后的包清单与包源交给 `WRT-CORE.yml`；两个脚本只消费数据，不含任何硬编码。
 
-代理类源（如 `nikki`）只挂在需要它的 profile 下，避免把 `mihomo-alpha` / `mihomo-meta`
-这类上游 Kconfig 循环带进其它固件。
+包源有两种 `mode`：
+
+- `package`（默认）：从仓库克隆到持久缓存，再把包复制进 `package/`（`special` 可选 `pkg` / `name`）
+- `official-feed`：按官方 `src-git` 写进 `feeds.conf`，由 `feeds update/install` 安装。
+  `nikki` 走这条路径，源为 `nikkinikki-org/OpenWrt-nikki`（官方仓库），`prune` 会在安装后
+  移除 `mihomo-meta` 等冲突包。代理类源只挂在需要它的 profile 下，避免上游 Kconfig 循环
+  带进其它固件。
 
 ### feed 禁用
 
@@ -125,7 +121,7 @@ Config——自定义配置
 1. 在 `feeds` 里声明插件源（若需要）
 2. 在 `profiles` 里加一个组合，写 `packages` 与 `feeds`
 3. 在 `builds` 里加一行指定产物名、上游、组合（`name` 也是 Release tag 前缀，必须唯一，`plan-builds.py` 会自检）
-4. 在 `IPQ53XX-Build.yml` 的 `PROFILE` 下拉框加一个选项（仅影响手动单选，ALL 会自动包含新组合）
+4. 在 `Build.yml` 的 `PROFILE` 下拉框加一个选项（仅影响手动单选，ALL 会自动包含新组合）
 
 ## 插件控制
 

@@ -6,7 +6,7 @@ set -euo pipefail
 
 # 宿主机的 Go 只是“能省时间就省”的引导件：不同源码（如大雕 LEDE）未必用到这些配置项，
 # runner 上也可能没装工具，探测不到就跳过，不能在这里把整个构建刷掉。
-# honk 已改用官方预编译二进制，不再有 Rust/BPF 源码编译，相关主机工具链逻辑已移除。
+# 源码编译需要的 Rust/LLVM 主机工具链已移除，这里只保留 Go 引导与 Python PGO 优化。
 GO_ROOT=""
 if command -v go > /dev/null 2>&1; then
 	GO_ROOT=$(go env GOROOT 2>/dev/null || true)

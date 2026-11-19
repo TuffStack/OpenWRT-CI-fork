@@ -79,31 +79,17 @@ UPDATE_PACKAGE() {
 	fi
 }
 
-# 官方 honk：核心用本地预编译二进制包（Scripts/honk/，Makefile 直接下载
-# daeuniverse/honk 的官方 release 二进制，不编译 Rust）；LuCI 页从官方
-# daeuniverse/openwrt-packages 复制 luci-app-honk + luci-lib-daeuniverse（纯
-# JS/JSON，无需 Lua/Rust 工具链）。这样彻底去掉对 kenzok8/openwrt-honk 的依赖。
-setup_honk_official() {
-	local REPO="$1" BRANCH="$2"
-	clone_or_update "$REPO" "$BRANCH"
-	local SRC="$PKG_SRC_DIR"
-
-	# 官方 LuCI 包
-	rm -rf ./package/luci-app-honk ./package/luci-lib-daeuniverse
-	local p
-	for p in luci-app-honk luci-lib-daeuniverse; do
-		[ -f "$SRC/$p/Makefile" ] && cp -rf "$SRC/$p" "./package/$p" \
-			|| echo "::warning::官方源缺 $p（上游结构变化）"
+# 官方 feed：由 prepare-feeds.sh 注册 src-git，再由 ./scripts/feeds update/install
+# 安装到这里；本脚本不再复制整仓，只清理清单声明的同源冲突包（如 mihomo-meta），
+# 避免上游 Kconfig 循环把不需要的代理实现带进固件。
+setup_official_feed() {
+	local NAME="$1" PRUNE="$2"
+	echo "Feed $NAME: 官方 src-git 安装，跳过本地复制"
+	local P
+	for P in $PRUNE; do
+		[ "$P" = "$NAME" ] && { echo "::error::官方 feed $NAME 的 prune 不能包含自身"; exit 1; }
+		rm -rf "./feeds/$NAME/$P" "./package/feeds/$NAME/$P"
 	done
-
-	# honk 核心：本仓库自带的本地包（脚本同目录下 honk/）
-	local LOCAL="$(cd "$(dirname "$0")" && pwd)/honk"
-	rm -rf ./package/honk
-	if [ -f "$LOCAL/Makefile" ]; then
-		cp -rf "$LOCAL" ./package/honk
-	else
-		echo "::error::本地 honk 包缺失：$LOCAL"; exit 1
-	fi
 }
 
 # 正常由 plan 作业注入；本地单独调试时回退到清单按 profile 取值
@@ -140,11 +126,13 @@ for f in json.loads(sys.argv[1]):
 [ -s "$FEEDS_TSV" ] || { echo "::error::WRT_FEEDS 展开后为空"; exit 1; }
 
 while IFS='|' read -r F_NAME F_REPO F_BRANCH F_SPECIAL F_PRUNE F_MODE; do
+	# Windows 本地调试时 Python stdout 会输出 CRLF，去掉行尾 \r 避免模式匹配失败
+	F_MODE="${F_MODE%$'\r'}"
 	[ -n "$F_NAME" ] || continue
 	case "$F_MODE" in
-		package)   UPDATE_PACKAGE "$F_NAME" "$F_REPO" "$F_BRANCH" "$F_SPECIAL" "$F_PRUNE" ;;
-		honk-official) setup_honk_official "$F_REPO" "$F_BRANCH" ;;
-		*)         echo "::error::未知包源模式 $F_MODE（$F_NAME）"; exit 1 ;;
+		package)       UPDATE_PACKAGE "$F_NAME" "$F_REPO" "$F_BRANCH" "$F_SPECIAL" "$F_PRUNE" ;;
+		official-feed) setup_official_feed "$F_NAME" "$F_PRUNE" ;;
+		*)             echo "::error::未知包源模式 $F_MODE（$F_NAME）"; exit 1 ;;
 	esac
 done < "$FEEDS_TSV"
 rm -f "$FEEDS_TSV"

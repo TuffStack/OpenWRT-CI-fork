@@ -63,20 +63,9 @@ if [ -f "$PRIVATE" ]; then
 	echo "Applying private configurations from PRIVATE.txt..."
 fi
 
-# 顺序即优先级：平台 -> profile 内核开关 -> 全局必装 -> 本固件插件差异 -> 私有覆盖
+# 顺序即优先级：平台 -> 全局必装 -> 本固件插件差异 -> 私有覆盖
 {
 	cat "$CFG_DIR/BASE.txt"
-	# VIKINGYFY 源码在 qualcommbe 上默认关 DEBUG_INFO_BTF（BUILDBOT + target 白名单），
-	# 且 DEBUG_INFO_REDUCED 默认 y，而 BTF 依赖 !REDUCED。honk 的 eBPF CO-RE
-	# 必须有内核 BTF，因此只允许需要的 profile 通过 kernelConfig 显式开启。
-	python3 -c '
-import json, sys
-cfg = json.load(open(sys.argv[1], encoding="utf-8"))
-for line in cfg["profiles"][sys.argv[2]].get("kernelConfig", []):
-    if not line.startswith("CONFIG_"):
-        sys.exit("::error::kernelConfig 非法行: %r" % line)
-    print(line)
-' "$CFG_DIR/builds.json" "$PROFILE"
 	emit_y "$CFG_DIR/ENABLE.conf"
 	emit_packages
 	if [ -f "$PRIVATE" ]; then
@@ -138,9 +127,8 @@ fi
 # 审计：导出最终进固件的包，报告白名单外的应用层插件（LEDE 漏网项会在这里显形）
 REPORT="$REPORT_DIR/packages-$SOURCE_TAG-$PROFILE.txt"
 { grep -oP '^CONFIG_PACKAGE_\K[^=]+(?==y)' .config || true; } | sort -u > "$REPORT"
-# 只报告"其它 profile 的插件混入本固件"。LuCI 基线组件（luci-app-firewall /
-# luci-theme-bootstrap 等）与 luci-app-ssr-plus_INCLUDE_* 这类 Kconfig 选项
-# 不是插件，不参与审计，避免把正常项误报为失控。
+# 只报告"其它 profile 的插件混入本固件"。luci-app-firewall / luci-theme-bootstrap
+# 这类 LuCI 基线组件不是插件，不参与审计，避免把正常项误报为失控。
 UNEXPECTED=$(comm -12 "$APP_PKGS" "$REPORT" | grep -Fvx -f "$ALLOW" || true)
 if [ -n "$UNEXPECTED" ]; then
 	echo "::warning::其它插件组合的包混入: $(echo $UNEXPECTED | tr '\n' ' ')"
