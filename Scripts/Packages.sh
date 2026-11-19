@@ -79,17 +79,25 @@ UPDATE_PACKAGE() {
 	fi
 }
 
-# 官方 feed：由 prepare-feeds.sh 注册 src-git，再由 ./scripts/feeds update/install
-# 安装到这里；本脚本不再复制整仓，只清理清单声明的同源冲突包（如 mihomo-meta），
-# 避免上游 Kconfig 循环把不需要的代理实现带进固件。
-setup_official_feed() {
-	local NAME="$1" PRUNE="$2"
-	echo "Feed $NAME: 官方 src-git 安装，跳过本地复制"
+# 官方仓库安装：从官方仓库的持久缓存中精确复制需要的包目录到 package/。
+# 不注册 src-git、不执行 feeds install -a，避免一个代理 feed 影响其它固件的 Kconfig；
+# 也不用整仓复制（package/<repo> 下的二级 Makefile 不会被 OpenWrt 扫描到）。
+setup_official_packages() {
+	local NAME="$1" REPO="$2" BRANCH="$3" PRUNE="$4" COPY="$5"
 	local P
 	for P in $PRUNE; do
-		[ "$P" = "$NAME" ] && { echo "::error::官方 feed $NAME 的 prune 不能包含自身"; exit 1; }
-		rm -rf "./feeds/$NAME/$P" "./package/feeds/$NAME/$P"
+		find ./feeds -maxdepth 4 -type d -iname "*$P*" -prune -exec rm -rf {} + 2>/dev/null || true
+		rm -rf "./package/$P"
 	done
+
+	clone_or_update "$REPO" "$BRANCH"
+	local SRC="$PKG_SRC_DIR"
+	for P in $COPY; do
+		[ -f "$SRC/$P/Makefile" ] || { echo "::error::$NAME 官方仓库缺少包目录 $P"; exit 1; }
+		rm -rf "./package/$P"
+		cp -rf "$SRC/$P" "./package/$P"
+	done
+	echo "Feed $NAME: 已从官方仓库安装 ${COPY// /, }"
 }
 
 # 正常由 plan 作业注入；本地单独调试时回退到清单按 profile 取值
@@ -118,6 +126,7 @@ for f in json.loads(sys.argv[1]):
         f.get("special", ""),
         " ".join(f.get("prune", [])),
         f.get("mode", "package"),
+        " ".join(f.get("copy", [])),
     ]
     if any("|" in x for x in fields):
         sys.exit("::error::包源字段含分隔符 |: %r" % (fields,))
@@ -125,14 +134,15 @@ for f in json.loads(sys.argv[1]):
 ' "$WRT_FEEDS" > "$FEEDS_TSV" || { echo "::error::展开 WRT_FEEDS 失败"; exit 1; }
 [ -s "$FEEDS_TSV" ] || { echo "::error::WRT_FEEDS 展开后为空"; exit 1; }
 
-while IFS='|' read -r F_NAME F_REPO F_BRANCH F_SPECIAL F_PRUNE F_MODE; do
+while IFS='|' read -r F_NAME F_REPO F_BRANCH F_SPECIAL F_PRUNE F_MODE F_COPY; do
 	# Windows 本地调试时 Python stdout 会输出 CRLF，去掉行尾 \r 避免模式匹配失败
 	F_MODE="${F_MODE%$'\r'}"
+	F_COPY="${F_COPY%$'\r'}"
 	[ -n "$F_NAME" ] || continue
 	case "$F_MODE" in
-		package)       UPDATE_PACKAGE "$F_NAME" "$F_REPO" "$F_BRANCH" "$F_SPECIAL" "$F_PRUNE" ;;
-		official-feed) setup_official_feed "$F_NAME" "$F_PRUNE" ;;
-		*)             echo "::error::未知包源模式 $F_MODE（$F_NAME）"; exit 1 ;;
+		package)            UPDATE_PACKAGE "$F_NAME" "$F_REPO" "$F_BRANCH" "$F_SPECIAL" "$F_PRUNE" ;;
+		official-packages)  setup_official_packages "$F_NAME" "$F_REPO" "$F_BRANCH" "$F_PRUNE" "$F_COPY" ;;
+		*)                  echo "::error::未知包源模式 $F_MODE（$F_NAME）"; exit 1 ;;
 	esac
 done < "$FEEDS_TSV"
 rm -f "$FEEDS_TSV"

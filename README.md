@@ -103,10 +103,11 @@ Config——自定义配置
 包源有两种 `mode`：
 
 - `package`（默认）：从仓库克隆到持久缓存，再把包复制进 `package/`（`special` 可选 `pkg` / `name`）
-- `official-feed`：按官方 `src-git` 写进 `feeds.conf`，由 `feeds update/install` 安装。
-  `nikki` 走这条路径，源为 `nikkinikki-org/OpenWrt-nikki`（官方仓库），`prune` 会在安装后
-  移除 `mihomo-meta` 等冲突包。代理类源只挂在需要它的 profile 下，避免上游 Kconfig 循环
-  带进其它固件。
+- `official-packages`：从官方仓库克隆到持久缓存，按 `copy` 精确复制列出的包目录到 `package/`，
+  `prune` 清理源码自带或上轮残留的同名包。`nikki` 走这条路径，源为官方
+  `nikkinikki-org/OpenWrt-nikki`，只复制 `nikki` / `luci-app-nikki` / `mihomo-alpha`，
+  不注册 feed、不执行 `feeds install -a`，避免把 `mihomo-meta` 等冲突包带进 Kconfig。
+  代理类源只挂在需要它的 profile 下。
 
 ### feed 禁用
 

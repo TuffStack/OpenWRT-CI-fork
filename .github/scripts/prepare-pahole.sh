@@ -9,7 +9,8 @@
 # pahole 存在但 --version 输出为空时（最常见是动态链接的 libdw.so.1 找不到），
 # $(shell,...) 展开为空，"default" 成了非法语句，oldconfig 直接 syntax error，
 # toolchain/kernel-headers 随之失败。
-# 这里保证 pahole 要么能报出版本号，要么对内核表现为版本 0（BTF 选项自动关闭）。
+# 这里保证 pahole 要么能报出合法版本号，要么对内核表现为版本 0。
+# 注意：这与 BTF 无关，CONFIG_PAHOLE_VERSION 在 Linux 6.x 中无条件求值。
 set -uo pipefail
 
 HOST_BIN="$PWD/staging_dir/host/bin"
@@ -17,14 +18,14 @@ HOST_LIB="$PWD/staging_dir/host/lib"
 LIBDW="$HOST_LIB/libdw.so.1"
 
 # 上一轮兜底可能把真 pahole 换成了 stub。宿主机 libdw1 修好后要能自动恢复，
-# 否则 PAHOLE_VERSION 会一直是 0，BTF 被静默关掉。
+# 否则 PAHOLE_VERSION 会一直是 0，等于长期禁用 pahole 探测。
 if [ -f "$HOST_BIN/pahole" ] && grep -q 'disabled by CI' "$HOST_BIN/pahole" 2>/dev/null; then
 	if [ -x "$HOST_BIN/pahole.disabled" ]; then
 		mv -f "$HOST_BIN/pahole.disabled" "$HOST_BIN/pahole"
 		echo "pahole: 已从上一轮兜底恢复真二进制"
 	else
 		rm -f "$HOST_BIN/pahole"
-		echo "::warning::上一轮 pahole stub 无备份，已删除；请重建 tools/dwarves 以恢复 BTF"
+		echo "::warning::上一轮 pahole stub 无备份，已删除；请重建 tools/dwarves 以恢复 pahole"
 	fi
 fi
 
@@ -56,7 +57,7 @@ pahole_version() {  # $1=pahole 路径，$2=可选的附加库目录
 ACTIVE="${CANDIDATES[0]}"
 if VER="$(pahole_version "$ACTIVE")"; then
 	if [ "$VER" = "v0.0" ]; then
-		echo "::warning::pahole 仍被 CI 禁用（$ACTIVE -> $VER），BTF 选项自动关闭"
+		echo "::warning::pahole 仍被 CI 禁用（$ACTIVE -> $VER），内核按版本 0 处理"
 	else
 		echo "pahole: $ACTIVE -> $VER"
 	fi
@@ -108,7 +109,7 @@ EOF
 fi
 
 # 兜底：显式声明 pahole 不可用。--version 返回 v0.0 让 Kconfig 拿到合法整数，
-# 其它调用直接失败（不静默产出坏 BTF）；PAHOLE_VERSION=0 会让 BTF 选项自动关闭。
+# 其它调用直接失败（不静默产出坏结果）；PAHOLE_VERSION=0 是内核可接受的值。
 # 先留一份真二进制，宿主机 libdw1 修好后下一轮可自动恢复。
 if [ -f "$HOST_BIN/pahole" ] && ! grep -q 'disabled by CI' "$HOST_BIN/pahole" 2>/dev/null; then
 	mv -f "$HOST_BIN/pahole" "$HOST_BIN/pahole.disabled"
@@ -124,8 +125,8 @@ exit 1
 EOF
 chmod +x "$HOST_BIN/pahole"
 if VER="$(pahole_version "$HOST_BIN/pahole")"; then
-	echo "::warning::pahole 无法修复，已禁用内核 pahole 探测（BTF 选项自动关闭）: $VER"
-	[ -e "$LIBDW" ] || echo "::warning::$LIBDW 也不存在，如需 BTF 请重建 tools/elfutils 或安装宿主机 libdw1"
+	echo "::warning::pahole 无法修复，已禁用内核 pahole 探测（按版本 0 处理）: $VER"
+	[ -e "$LIBDW" ] || echo "::warning::$LIBDW 也不存在，如需 pahole 请重建 tools/elfutils 或安装宿主机 libdw1"
 	exit 0
 fi
 

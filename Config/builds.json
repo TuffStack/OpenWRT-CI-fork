@@ -7,7 +7,14 @@
     "vantage": { "name": "vantage", "repo": "anothaDev/luci-theme-vantage", "branch": "main" },
     "lucky": { "name": "lucky", "repo": "gdy666/luci-app-lucky", "branch": "main" },
     "partexp": { "name": "partexp", "repo": "sirpdboy/luci-app-partexp", "branch": "main" },
-    "nikki": { "name": "nikki", "repo": "nikkinikki-org/OpenWrt-nikki", "branch": "main", "mode": "official-feed", "prune": ["mihomo-meta"] },
+    "nikki": {
+      "name": "nikki",
+      "repo": "nikkinikki-org/OpenWrt-nikki",
+      "branch": "main",
+      "mode": "official-packages",
+      "copy": ["nikki", "luci-app-nikki", "mihomo-alpha"],
+      "prune": ["nikki", "mihomo"]
+    },
     "viking": {
       "name": "viking",
       "repo": "VIKINGYFY/packages",

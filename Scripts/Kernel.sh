@@ -5,7 +5,8 @@
 
 set -e
 
-# ===== OpenWrt 未暴露的原生内核符号 =====
+# ===== Docker 原生内核符号（全局注入）=====
+# 定位最后一个存在的配置片段（后写覆盖先写）
 BOARD="$(grep -m1 -oP '^CONFIG_TARGET_\K[a-z0-9]+(?==y)' ./.config)"
 [ -n "$BOARD" ] || { echo "kernel: 无法识别 target"; exit 1; }
 
@@ -20,7 +21,6 @@ fi
 
 SUBTARGET="$(grep -m1 -oP "^CONFIG_TARGET_${BOARD}_\K[\w]+(?=\=y)" ./.config)"
 
-# 后写覆盖先写 —— 必须追加到最后一个存在的片段文件
 KCONF=""
 for f in "target/linux/generic/config-$KPATCH" \
          "target/linux/$BOARD/config-$KPATCH" \
@@ -29,29 +29,6 @@ for f in "target/linux/generic/config-$KPATCH" \
 done
 [ -n "$KCONF" ] || { echo "kernel: 找不到内核配置片段"; exit 1; }
 
-while IFS= read -r LINE; do
-	NAME="${LINE%%=*}"
-	if grep -qE "^${NAME}=|^# ${NAME} is not set" "$KCONF"; then
-		sed -i "s|^${NAME}=.*|${LINE}|; s|^# ${NAME} is not set|${LINE}|" "$KCONF"
-	else
-		echo "$LINE" >> "$KCONF"
-	fi
-done <<'EOF'
-CONFIG_BPF=y
-CONFIG_BPF_SYSCALL=y
-CONFIG_BPF_JIT=y
-CONFIG_NET_INGRESS=y
-CONFIG_NET_EGRESS=y
-CONFIG_NET_CLS_ACT=y
-CONFIG_NET_SCH_INGRESS=m
-CONFIG_NET_CLS_BPF=m
-EOF
-
-echo "kernel: 原生内核符号已写入 $KCONF"
-grep -E '^CONFIG_(BPF|NET_INGRESS|NET_EGRESS|NET_CLS_ACT|NET_SCH_INGRESS|NET_CLS_BPF)' "$KCONF" || true
-
-
-# ===== Docker 原生内核符号（全局注入）=====
 while IFS= read -r LINE; do
 	NAME="${LINE%%=*}"
 	if grep -qE "^${NAME}=|^# ${NAME} is not set" "$KCONF"; then
