@@ -156,7 +156,8 @@ jobs:
           else
             rm -rf "$SRC"
             git clone --depth=1 --single-branch --branch "$WRT_BRANCH" "$WRT_REPO" "$SRC"
-            cd "$SRC"          fi
+            cd "$SRC"
+          fi
           
           # 清掉上次构建残留，但保留 feeds / staging_dir（工具链）
           git clean -ffdx \
